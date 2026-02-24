@@ -22,7 +22,7 @@
     },
     "cliPrompt" : "./agents/prompts/questions_prompt.md",
     "cliCommands" : [
-      "./cicd/scripts/run-agent.sh"
+      "./agents/scripts/run-agent.sh"
     ],
     "outputType" : "none",
     "ticketContextDepth" : 0,

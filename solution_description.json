@@ -31,7 +31,7 @@
       "fewShots" : "./agents/instructions/enhancement/solution_design_few_shots.md"
     },
       "cliCommands" : [
-        "./cicd/scripts/run-agent.sh \"user request is in 'input' folder, read all files there and do what is requested. **IMPORTANT** implementation details and development is not part of the task. You must not write code here. Follow instructions from input. request.md file contains json with all detail. 'request' string there contains details of ticket from which was triggered the request. **IMPORTANT** write the description to outputs/response.md and the diagram to outputs/diagram.md files.\""
+        "./agents/scripts/run-agent.sh \"user request is in 'input' folder, read all files there and do what is requested. **IMPORTANT** implementation details and development is not part of the task. You must not write code here. Follow instructions from input. request.md file contains json with all detail. 'request' string there contains details of ticket from which was triggered the request. **IMPORTANT** write the description to outputs/response.md and the diagram to outputs/diagram.md files.\""
       ],
     "outputType" : "none",
     "ticketContextDepth" : 0,

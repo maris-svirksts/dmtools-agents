@@ -21,7 +21,7 @@
     },
     "cliPrompt" : "./agents/prompts/po_refinement_prompt.md",
     "cliCommands" : [
-      "./cicd/scripts/run-agent.sh"
+      "./agents/scripts/run-agent.sh"
     ],
     "outputType" : "field",
     "fieldName" : "Answer",
