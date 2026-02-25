@@ -18,7 +18,8 @@ const STATUSES = {
     PO_REVIEW: 'PO REVIEW',                         // transition name → reaches "PO Review" status in JD
     SOLUTION_ARCHITECTURE: 'SOLUTION ARCHITECTURE', // transition name → reaches "Solution Architecture" status in JD
     READY_FOR_DEVELOPMENT: 'Ready For Development',
-    IN_PROGRESS: 'In Progress',                     // transition name → reaches "In Development" status in JD
+    IN_DEVELOPMENT: 'In Development',               // transition name → reaches "In Development" status in JD
+    IN_PROGRESS: 'In Progress',                     // transition name → reaches "In Development" on Task/SD tickets
     BLOCKED: 'Blocked',
     TODO: 'To Do',
     DONE: 'Done'
@@ -39,6 +40,7 @@ const LABELS = {
     AI_QUESTIONS_ASKED: 'ai_questions_asked',
     AI_SOLUTION_DESIGN_CREATED: 'ai_solution_design_created',
     AI_DEVELOPED: 'ai_developed',
+    AI_PR_REVIEWED: 'ai_pr_reviewed',
     AI_INTAKE: 'ai_intake',
     QUESTION: 'q',
     SD_CORE: 'sd_core',

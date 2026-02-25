@@ -85,42 +85,14 @@ function configureGitAuthor() {
 }
 
 /**
- * Create git branch, stage changes, commit, and push
+ * Stage changes, commit, and push on current branch
  *
- * @param {string} branchName - Branch name to create
+ * @param {string} branchName - Current branch name (already checked out by preCliJSAction)
  * @param {string} commitMessage - Commit message
  * @returns {Object} Result with success status and branch name
  */
 function performGitOperations(branchName, commitMessage) {
     try {
-        // Check if branch already exists locally and delete it
-        console.log('Checking if branch exists locally:', branchName);
-        try {
-            const localBranches = cli_execute_command({
-                command: 'git branch --list "' + branchName + '"'
-            }) || '';
-
-            if (localBranches.trim()) {
-                console.log('Branch exists locally, deleting it first...');
-                // Switch to base branch first
-                cli_execute_command({
-                    command: 'git checkout ' + GIT_CONFIG.DEFAULT_BASE_BRANCH
-                });
-                // Delete local branch
-                cli_execute_command({
-                    command: 'git branch -D ' + branchName
-                });
-            }
-        } catch (checkError) {
-            console.warn('Error checking/deleting existing local branch:', checkError);
-        }
-
-        // Create and checkout new branch
-        console.log('Creating branch:', branchName);
-        cli_execute_command({
-            command: 'git checkout -b ' + branchName
-        });
-
         // Stage all changes
         console.log('Staging changes...');
         cli_execute_command({
@@ -315,10 +287,6 @@ function action(params) {
         console.log('Processing development workflow for ticket:', ticketKey);
         console.log('Ticket summary:', ticketSummary);
 
-        // Use 'ai' prefix for all AI-generated branches
-        const branchPrefix = 'ai';
-        console.log('Using branch prefix:', branchPrefix);
-
         // Configure git author
         if (!configureGitAuthor()) {
             const error = 'Failed to configure git author';
@@ -329,9 +297,14 @@ function action(params) {
             };
         }
 
-        // Generate unique branch name with 'ai' prefix
-        const branchName = generateUniqueBranchName(branchPrefix, ticketKey);
-        console.log('Using branch name:', branchName);
+        // Branch was already checked out by preCliJSAction — read current branch
+        const branchName = (cli_execute_command({ command: 'git branch --show-current' }) || '').trim();
+        if (!branchName) {
+            const error = 'Could not determine current git branch';
+            postErrorCommentToJira(ticketKey, 'Git Configuration', error);
+            return { success: false, error: error };
+        }
+        console.log('Using current branch:', branchName);
 
         // Prepare commit message
         const commitMessage = ticketKey + ' ' + ticketSummary;
@@ -382,8 +355,7 @@ function action(params) {
             };
         }
 
-        // Assign ticket to initiator and move to In Review status
-        // Note: Many Jira workflows require assignment before status transition
+        // Assign ticket to initiator
         try {
             const initiatorId = params.initiator;
             if (initiatorId) {
@@ -393,17 +365,8 @@ function action(params) {
                 });
                 console.log('✅ Assigned ticket to initiator');
             }
-            
-            jira_move_to_status({
-                key: ticketKey,
-                statusName: STATUSES.IN_REVIEW
-            });
-            console.log('✅ Moved ticket to In Review status');
         } catch (error) {
-            console.error('❌ Failed to assign and move ticket to In Review:', error);
-            // Log the full error details for debugging
-            console.error('Error details:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
-            // Still continue with the workflow - don't fail the entire process
+            console.warn('Failed to assign ticket to initiator:', error);
         }
 
         // Post comment with PR details

@@ -1,0 +1,75 @@
+/**
+ * Checkout Branch Pre-CLI Action
+ * Creates or checks out the feature branch for the ticket before the CLI agent runs.
+ * Branch name format: ai/<TICKET-KEY>
+ * If the branch already exists (locally or remotely), it is checked out directly.
+ * postAction (developTicketAndCreatePR) then just commits and pushes the current branch.
+ */
+
+const { GIT_CONFIG } = require('./config.js');
+
+function action(params) {
+    try {
+        var ticketKey = params.ticket.key;
+        var branchName = 'ai/' + ticketKey;
+
+        console.log('Setting up branch for ticket:', ticketKey, '→', branchName);
+
+        // Configure git author
+        try {
+            cli_execute_command({ command: 'git config user.name "' + GIT_CONFIG.AUTHOR_NAME + '"' });
+            cli_execute_command({ command: 'git config user.email "' + GIT_CONFIG.AUTHOR_EMAIL + '"' });
+            console.log('Configured git author');
+        } catch (e) {
+            console.warn('Failed to configure git author:', e);
+        }
+
+        // Fetch latest remote state
+        try {
+            cli_execute_command({ command: 'git fetch origin --prune' });
+            console.log('Fetched remote');
+        } catch (e) {
+            console.warn('Could not fetch remote branches:', e);
+        }
+
+        // Check if branch exists locally
+        var localBranches = '';
+        try {
+            localBranches = cli_execute_command({ command: 'git branch --list "' + branchName + '"' }) || '';
+        } catch (e) {
+            console.warn('Error checking local branches:', e);
+        }
+
+        if (localBranches.trim()) {
+            // Branch exists locally — check it out
+            console.log('Branch exists locally, checking out:', branchName);
+            cli_execute_command({ command: 'git checkout ' + branchName });
+        } else {
+            // Check if branch exists on remote
+            var remoteBranches = '';
+            try {
+                remoteBranches = cli_execute_command({ command: 'git ls-remote --heads origin ' + branchName }) || '';
+            } catch (e) {
+                console.warn('Error checking remote branches:', e);
+            }
+
+            if (remoteBranches.trim()) {
+                // Exists on remote — checkout tracking remote
+                console.log('Branch exists on remote, checking out with tracking:', branchName);
+                cli_execute_command({ command: 'git checkout -b ' + branchName + ' origin/' + branchName });
+            } else {
+                // New branch — start from base branch
+                console.log('Creating new branch from', GIT_CONFIG.DEFAULT_BASE_BRANCH + ':', branchName);
+                cli_execute_command({ command: 'git checkout ' + GIT_CONFIG.DEFAULT_BASE_BRANCH });
+                cli_execute_command({ command: 'git pull origin ' + GIT_CONFIG.DEFAULT_BASE_BRANCH });
+                cli_execute_command({ command: 'git checkout -b ' + branchName });
+            }
+        }
+
+        console.log('Branch ready:', branchName);
+
+    } catch (error) {
+        console.error('Error in checkoutBranch:', error);
+        // Non-fatal: log but do not block CLI execution
+    }
+}

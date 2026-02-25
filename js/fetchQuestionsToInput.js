@@ -27,8 +27,6 @@ function action(params) {
             for (var i = 0; i < rawQuestions.length; i++) {
                 var issue = rawQuestions[i];
                 var f = issue.fields || {};
-                console.log('f: ' + f);
-                console.log('f s : ' + JSON.stringify(f, null, 2));
                 questions.push({
                     key: issue.key || '',
                     summary: f.summary || '',
@@ -49,3 +47,5 @@ function action(params) {
         console.error('Error in fetchQuestionsToInput:', error);
     }
 }
+
+module.exports = { action };
