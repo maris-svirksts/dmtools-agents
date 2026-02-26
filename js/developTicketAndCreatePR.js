@@ -479,6 +479,17 @@ function action(params) {
             console.warn('Failed to assign ticket to initiator:', error);
         }
 
+        // Move ticket to In Review status
+        try {
+            jira_move_to_status({
+                key: ticketKey,
+                statusName: STATUSES.IN_REVIEW
+            });
+            console.log('✅ Moved ' + ticketKey + ' to In Review');
+        } catch (error) {
+            console.warn('Failed to move ticket to In Review:', error);
+        }
+
         // Post comment with PR details
         postPRCommentToJira(ticketKey, prResult.prUrl, branchName);
 
