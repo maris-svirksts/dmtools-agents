@@ -82,7 +82,10 @@ function checkoutBranch(ticketKey) {
 
 function action(params) {
     try {
-        var folder = params.inputFolderPath;
+        // Handle both workflow and standalone dmtools execution
+        var actualParams = params.jobParams || params;
+
+        var folder = actualParams.inputFolderPath;
         var ticketKey = folder.split('/').pop();
 
         // 1. Move ticket to In Development
@@ -101,7 +104,7 @@ function action(params) {
         }
 
         // 3. Fetch questions with answers into input folder
-        fetchQuestionsToInput.action(params);
+        fetchQuestionsToInput.action(actualParams);
 
     } catch (error) {
         console.error('Error in preCliDevelopmentSetup:', error);
