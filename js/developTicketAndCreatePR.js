@@ -303,10 +303,14 @@ function postErrorCommentToJira(ticketKey, stage, errorMessage) {
  */
 function action(params) {
     try {
-        const ticketKey = params.ticket.key;
-        const ticketSummary = params.ticket.fields.summary;
-        const ticketDescription = params.ticket.fields.description || '';
-        const developmentSummary = params.response || '';
+        // Handle both workflow and standalone dmtools execution
+        // In standalone mode, params are wrapped in jobParams
+        const actualParams = params.jobParams || params;
+
+        const ticketKey = actualParams.ticket.key;
+        const ticketSummary = actualParams.ticket.fields.summary;
+        const ticketDescription = actualParams.ticket.fields.description || '';
+        const developmentSummary = actualParams.response || '';
 
         console.log('Processing development workflow for ticket:', ticketKey);
         console.log('Ticket summary:', ticketSummary);
@@ -384,7 +388,7 @@ function action(params) {
 
         // Assign ticket to initiator
         try {
-            const initiatorId = params.initiator;
+            const initiatorId = actualParams.initiator;
             if (initiatorId) {
                 jira_assign_ticket_to({
                     key: ticketKey,
@@ -410,8 +414,8 @@ function action(params) {
         }
 
         // Remove WIP label if configured (dynamically generated from contextId)
-        const wipLabel = params.metadata && params.metadata.contextId
-            ? params.metadata.contextId + '_wip'
+        const wipLabel = actualParams.metadata && actualParams.metadata.contextId
+            ? actualParams.metadata.contextId + '_wip'
             : null;
         if (wipLabel) {
             try {
@@ -439,8 +443,9 @@ function action(params) {
 
         // Try to post error comment to ticket
         try {
-            if (params && params.ticket && params.ticket.key) {
-                postErrorCommentToJira(params.ticket.key, 'Workflow Execution', error.toString());
+            const actualParams = params.jobParams || params;
+            if (actualParams && actualParams.ticket && actualParams.ticket.key) {
+                postErrorCommentToJira(actualParams.ticket.key, 'Workflow Execution', error.toString());
             }
         } catch (commentError) {
             console.error('Failed to post error comment:', commentError);
