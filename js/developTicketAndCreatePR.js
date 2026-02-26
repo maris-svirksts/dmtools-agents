@@ -209,12 +209,60 @@ function createPullRequest(title, branchName) {
             command: 'gh pr create --title "' + escapedTitle + '" --body-file "' + bodyFilePath + '" --base ' + GIT_CONFIG.DEFAULT_BASE_BRANCH + ' --head ' + branchName
         }) || '';
 
-        // Extract PR URL from output
-        const urlMatch = output.match(/https:\/\/github\.com\/[^\s]+/);
-        const prUrl = urlMatch ? urlMatch[0] : null;
+        console.log('Raw gh pr create output (length=' + output.length + '):');
+        console.log('---START---');
+        console.log(output);
+        console.log('---END---');
+
+        // Extract PR URL from output - try multiple patterns
+        let prUrl = null;
+
+        // Pattern 1: Full URL
+        let urlMatch = output.match(/https:\/\/github\.com\/[^\s]+/);
+        if (urlMatch) {
+            prUrl = urlMatch[0];
+            console.log('Found URL via pattern 1 (full URL):', prUrl);
+        }
+
+        // Pattern 2: If not found, try to get PR number and construct URL
+        if (!prUrl) {
+            const prNumberMatch = output.match(/#(\d+)/);
+            if (prNumberMatch) {
+                // Get repo info from git remote
+                try {
+                    const remoteUrl = cli_execute_command({
+                        command: 'git config --get remote.origin.url'
+                    }) || '';
+                    const repoMatch = remoteUrl.match(/github\.com[:/]([^/]+\/[^/.]+)/);
+                    if (repoMatch) {
+                        const repo = repoMatch[1].replace('.git', '');
+                        prUrl = 'https://github.com/' + repo + '/pull/' + prNumberMatch[1];
+                        console.log('Constructed URL from PR number #' + prNumberMatch[1] + ':', prUrl);
+                    }
+                } catch (e) {
+                    console.warn('Failed to construct URL from PR number:', e);
+                }
+            }
+        }
+
+        // Pattern 3: If still not found, query gh pr list for this branch
+        if (!prUrl) {
+            try {
+                const prListOutput = cli_execute_command({
+                    command: 'gh pr list --head ' + branchName + ' --json url --jq ".[0].url"'
+                }) || '';
+                const cleanedUrl = cleanCommandOutput(prListOutput);
+                if (cleanedUrl && cleanedUrl.startsWith('https://')) {
+                    prUrl = cleanedUrl;
+                    console.log('Found URL via gh pr list:', prUrl);
+                }
+            } catch (e) {
+                console.warn('Failed to get URL via gh pr list:', e);
+            }
+        }
 
         if (!prUrl) {
-            console.warn('PR created but could not extract URL from output:', output);
+            console.warn('PR created but could not extract URL from output');
         }
 
         console.log('✅ Pull Request created:', prUrl || '(URL not found in output)');
