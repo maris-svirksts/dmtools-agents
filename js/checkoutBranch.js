@@ -8,6 +8,24 @@
 
 const { GIT_CONFIG } = require('./config.js');
 
+/**
+ * Clean command output from script wrapper artifacts
+ * @param {string} output - Raw command output
+ * @returns {string} Cleaned output
+ */
+function cleanCommandOutput(output) {
+    if (!output) {
+        return '';
+    }
+    const lines = output.split('\n').filter(function(line) {
+        return line.indexOf('Script started') === -1 &&
+               line.indexOf('Script done') === -1 &&
+               line.indexOf('COMMAND=') === -1 &&
+               line.indexOf('COMMAND_EXIT_CODE=') === -1;
+    });
+    return lines.join('\n').trim();
+}
+
 function action(params) {
     try {
         var ticketKey = params.ticket.key;
@@ -35,7 +53,8 @@ function action(params) {
         // Check if branch exists locally
         var localBranches = '';
         try {
-            localBranches = cli_execute_command({ command: 'git branch --list "' + branchName + '"' }) || '';
+            var rawLocal = cli_execute_command({ command: 'git branch --list "' + branchName + '"' }) || '';
+            localBranches = cleanCommandOutput(rawLocal);
         } catch (e) {
             console.warn('Error checking local branches:', e);
         }
@@ -48,7 +67,8 @@ function action(params) {
             // Check if branch exists on remote
             var remoteBranches = '';
             try {
-                remoteBranches = cli_execute_command({ command: 'git ls-remote --heads origin ' + branchName }) || '';
+                var rawRemote = cli_execute_command({ command: 'git ls-remote --heads origin ' + branchName }) || '';
+                remoteBranches = cleanCommandOutput(rawRemote);
             } catch (e) {
                 console.warn('Error checking remote branches:', e);
             }

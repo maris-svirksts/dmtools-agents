@@ -8,6 +8,29 @@ const { extractTicketKey } = require('./common/jiraHelpers.js');
 const { GIT_CONFIG, STATUSES, LABELS } = require('./config.js');
 
 /**
+ * Clean command output from script wrapper artifacts
+ * Removes "Script started/done" lines that DMTools CLI adds
+ *
+ * @param {string} output - Raw command output
+ * @returns {string} Cleaned output
+ */
+function cleanCommandOutput(output) {
+    if (!output) {
+        return '';
+    }
+
+    // Remove "Script started" and "Script done" lines
+    const lines = output.split('\n').filter(function(line) {
+        return line.indexOf('Script started') === -1 &&
+               line.indexOf('Script done') === -1 &&
+               line.indexOf('COMMAND=') === -1 &&
+               line.indexOf('COMMAND_EXIT_CODE=') === -1;
+    });
+
+    return lines.join('\n').trim();
+}
+
+/**
  * Generate unique branch name with collision detection
  * Appends _1, _2, _3 etc. if branch already exists locally or remotely
  */
@@ -100,9 +123,10 @@ function performGitOperations(branchName, commitMessage) {
         });
 
         // Check if there are changes to commit
-        const statusOutput = cli_execute_command({
+        const rawStatusOutput = cli_execute_command({
             command: 'git status --porcelain'
         });
+        const statusOutput = cleanCommandOutput(rawStatusOutput);
 
         if (!statusOutput || !statusOutput.trim()) {
             console.warn('No changes to commit');
@@ -298,9 +322,12 @@ function action(params) {
         }
 
         // Branch was already checked out by preCliJSAction — read current branch
-        const branchName = (cli_execute_command({ command: 'git branch --show-current' }) || '').trim();
+        const rawBranchOutput = cli_execute_command({ command: 'git branch --show-current' }) || '';
+        const branchName = cleanCommandOutput(rawBranchOutput);
+
         if (!branchName) {
             const error = 'Could not determine current git branch';
+            console.error('Raw git branch output:', rawBranchOutput);
             postErrorCommentToJira(ticketKey, 'Git Configuration', error);
             return { success: false, error: error };
         }

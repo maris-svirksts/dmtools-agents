@@ -10,6 +10,24 @@
 const { GIT_CONFIG, STATUSES } = require('./config.js');
 
 /**
+ * Clean command output from script wrapper artifacts
+ * @param {string} output - Raw command output
+ * @returns {string} Cleaned output
+ */
+function cleanCommandOutput(output) {
+    if (!output) {
+        return '';
+    }
+    const lines = output.split('\n').filter(function(line) {
+        return line.indexOf('Script started') === -1 &&
+               line.indexOf('Script done') === -1 &&
+               line.indexOf('COMMAND=') === -1 &&
+               line.indexOf('COMMAND_EXIT_CODE=') === -1;
+    });
+    return lines.join('\n').trim();
+}
+
+/**
  * Find PR associated with ticket using GitHub CLI
  * Searches for PRs that mention the ticket key in title or branch
  *
@@ -147,9 +165,10 @@ function checkoutPRBranch(branchName) {
         });
 
         // Check if branch exists locally
-        const localBranch = cli_execute_command({
+        const rawLocalBranch = cli_execute_command({
             command: 'git branch --list "' + branchName + '"'
         }) || '';
+        const localBranch = cleanCommandOutput(rawLocalBranch);
 
         if (localBranch.trim()) {
             console.log('Branch exists locally, checking out');
@@ -162,9 +181,10 @@ function checkoutPRBranch(branchName) {
             });
         } else {
             // Check if exists on remote
-            const remoteBranch = cli_execute_command({
+            const rawRemoteBranch = cli_execute_command({
                 command: 'git ls-remote --heads origin ' + branchName
             }) || '';
+            const remoteBranch = cleanCommandOutput(rawRemoteBranch);
 
             if (remoteBranch.trim()) {
                 console.log('Branch exists on remote, checking out with tracking');
