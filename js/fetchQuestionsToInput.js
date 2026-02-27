@@ -48,4 +48,6 @@ function action(params) {
     }
 }
 
-module.exports = { action };
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { action };
+}
