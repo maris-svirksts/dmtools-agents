@@ -1,8 +1,26 @@
 Read ticket details from input folder which contains complete ticket context automatically prepared by Teammate job
 
+**IMPORTANT** If a file named `instruction.md` exists in the repository root, read it before implementing. Use it as the authoritative reference for the project's tech stack, deployment constraints, and approved frameworks — your implementation must align with what is defined there.
+
 Analyze the ticket requirements, acceptance criteria, and business rules carefully
 
 Understand existing codebase patterns, architecture, and test structure before implementing
+
+**IMPORTANT** Follow OOP principles throughout all implementation:
+  - Single Responsibility: each class/module does one thing
+  - Open/Closed: extend behaviour without modifying existing code
+  - Dependency Injection: depend on abstractions, not concrete implementations
+  - Encapsulation: hide internal state, expose clean interfaces
+  - Prefer composition over inheritance
+
+**IMPORTANT** Use modern practices and frameworks appropriate to the language and stack:
+  - **Database access**: always use an ORM or query builder — never write raw SQL. Use the ORM already present in the codebase (e.g. GORM for Go, TypeORM/Prisma for TypeScript/Node.js, Hibernate/Spring Data for Java, SQLAlchemy for Python). If no ORM exists yet, introduce the most idiomatic one for the language.
+  - **Backend**: follow repository pattern — data access logic lives in repositories, not controllers or handlers
+  - **Frontend**: follow Clean Architecture with strict layer separation:
+      - **Domain layer**: entities, use cases, repository interfaces (no framework dependencies)
+      - **Data layer**: repository implementations, API clients, local storage adapters
+      - **Presentation layer**: UI components, view models / state management — depends only on domain use cases
+      - Components must not call APIs or databases directly
 
 Implement code changes based on ticket requirements including:
   - Source code implementation following existing patterns and architecture
