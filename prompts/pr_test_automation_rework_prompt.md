@@ -20,7 +20,7 @@ The feature code is **already in main branch**. Your job is to:
 ## Output files
 
 - `outputs/response.md` — rework summary in **Jira Markdown** (short, factual): what was fixed + new test result
-- `outputs/pr_body.md` — same in **GitHub Markdown**
+- `outputs/pr_body.md` — same in **GitHub Markdown** (always required — updates PR description)
 - `outputs/test_automation_result.json` — new test result (see instructions for format)
 - `outputs/review_replies.json` — replies per thread: `{ "replies": [{ "inReplyToId": 123, "threadId": "PRRT_...", "reply": "Fixed: ..." }] }`
 - `outputs/bug_description.md` — updated bug description in Jira Markdown (only if test still FAILED)
