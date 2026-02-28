@@ -172,9 +172,12 @@ function fetchDiscussionsAndRawData(workspace, repository, pullRequestId) {
                 const graphqlThreadId = (reviewThreads[idx] && reviewThreads[idx].id)
                     ? reviewThreads[idx].id : null;
 
+                // Only inline review comments (with a file path) can be replied to via
+                // github_reply_to_pr_thread. PR-level review comments without a path
+                // will fail with 422 "in_reply_to invalid" — omit rootCommentId for those.
                 rawThreads.push({
                     index: idx + 1,
-                    rootCommentId: rootCommentId,  // int → github_reply_to_pr_thread.inReplyToId
+                    rootCommentId: thread.path ? rootCommentId : null,  // int → github_reply_to_pr_thread.inReplyToId
                     threadId: graphqlThreadId,      // GraphQL node ID → github_resolve_pr_thread.threadId
                     path: thread.path || null,
                     line: thread.line || thread.original_line || null,
