@@ -76,6 +76,8 @@ Scan for OWASP Top 10 and common vulnerabilities:
 
 **If recommendation is REQUEST_CHANGES or BLOCK**: Write inline comments only for BLOCKING and IMPORTANT issues. Do NOT add SUGGESTION-level inline comments. Minor improvements that do not affect correctness, security, or maintainability should not be posted.
 
+**CRITICAL — Diff-only rule**: Inline comments can ONLY be placed on lines that appear in `pr_diff.txt` (lines inside a diff hunk, prefixed with `+` or context lines within the changed block). If a finding concerns a file or line that is **not present in the diff** (e.g. a pre-existing Dockerfile, a config file not touched in this PR), you MUST NOT create an inline comment for it. Instead, include the finding in the **general comment** section with the file path and line number noted as text. Violating this rule causes the GitHub API to reject the comment with a 422 error.
+
 Write detailed review report to outputs/response.md following the formatting rules.
 
 **DO NOT** create commits, branches, or modify any code - you are only reviewing.

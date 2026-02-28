@@ -56,3 +56,5 @@ Categorize all findings as:
 End with clear recommendation: APPROVE / REQUEST CHANGES / BLOCK
 
 Be thorough, constructive, and specific. Provide file paths and line numbers for all findings.
+
+**CRITICAL — Inline comment diff-only rule**: Inline comments can ONLY be placed on lines that appear inside a diff hunk in `pr_diff.txt` (lines changed or added in this PR). If a finding is about a file or line **not touched in this PR**, include it in the general comment as text — do NOT create an inline comment for it. The GitHub API rejects inline comments on lines outside the diff with a 422 error.
