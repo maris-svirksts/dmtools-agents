@@ -39,22 +39,23 @@ function action(params) {
         const repoInfo = gh.getGitHubRepoInfo();
         if (!repoInfo) {
             const err = 'Could not determine GitHub repository from git remote';
-            try { jira_post_comment({ key: ticketKey, comment: 'h3. ⚠️ Test PR Review Setup Failed\n\n' + err }); } catch (e) {}
-            return { success: false, error: err };
+            try { jira_post_comment({ key: ticketKey, comment: 'h3. ⚠️ Test PR Review Setup Failed\n\n' + err + '\n\n_Review cancelled._' }); } catch (e) {}
+            return false;
         }
 
         // Step 2: Find PR on test/{KEY} branch specifically
         const pr = findTestPRForTicket(repoInfo.owner, repoInfo.repo, ticketKey);
         if (!pr) {
             const err = 'No test PR found for branch test/' + ticketKey;
-            try { jira_post_comment({ key: ticketKey, comment: 'h3. ⚠️ Test PR Review Setup Failed\n\n' + err }); } catch (e) {}
-            return { success: false, error: err };
+            try { jira_post_comment({ key: ticketKey, comment: 'h3. ⚠️ Test PR Review Setup Failed\n\n' + err + '\n\n_Review cancelled._' }); } catch (e) {}
+            return false;
         }
 
         // Step 3: PR details
         const prDetails = gh.getPRDetails(repoInfo.owner, repoInfo.repo, pr.number);
         if (!prDetails) {
-            return { success: false, error: 'Failed to fetch PR details for PR #' + pr.number };
+            try { jira_post_comment({ key: ticketKey, comment: 'h3. ⚠️ Test PR Review Setup Failed\n\nCould not fetch details for PR #' + pr.number + '.\n\n_Review cancelled._' }); } catch (e) {}
+            return false;
         }
 
         // Step 4: Checkout test branch
@@ -111,7 +112,7 @@ function action(params) {
                 comment: 'h3. ❌ Test PR Review Setup Error\n\n{code}' + error.toString() + '{code}'
             });
         } catch (e) {}
-        return { success: false, error: error.toString() };
+        return false;
     }
 }
 

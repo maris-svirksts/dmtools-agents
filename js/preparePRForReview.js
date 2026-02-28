@@ -19,31 +19,37 @@ function action(params) {
         const repoInfo = gh.getGitHubRepoInfo();
         if (!repoInfo) {
             const err = 'Could not determine GitHub repository from git remote';
-            try { jira_post_comment({ key: ticketKey, comment: 'h3. ⚠️ PR Review Setup Failed\n\n' + err }); } catch (e) {}
-            return { success: false, error: err };
+            try { jira_post_comment({ key: ticketKey, comment: 'h3. ⚠️ PR Review Setup Failed\n\n' + err + '\n\n_Review cancelled — no PR to review._' }); } catch (e) {}
+            return false;
         }
 
         // Step 2: Find PR
         const pr = gh.findPRForTicket(repoInfo.owner, repoInfo.repo, ticketKey);
         if (!pr) {
-            const err = 'No Pull Request found for ticket ' + ticketKey;
             try {
                 jira_post_comment({
                     key: ticketKey,
                     comment: 'h3. ⚠️ PR Review Setup Failed\n\n' +
-                        'Could not find a Pull Request associated with this ticket.\n\n' +
+                        'Could not find an open Pull Request associated with *' + ticketKey + '*.\n\n' +
                         'Please ensure:\n' +
-                        '* A PR has been created with ticket key in title or branch name\n' +
-                        '* The PR is open and accessible'
+                        '* A PR has been created with the ticket key in the title or branch name\n' +
+                        '* The PR is open and accessible\n\n' +
+                        '_Review cancelled — no PR to review._'
                 });
             } catch (e) {}
-            return { success: false, error: err };
+            return false;
         }
 
         // Step 3: PR details
         const prDetails = gh.getPRDetails(repoInfo.owner, repoInfo.repo, pr.number);
         if (!prDetails) {
-            return { success: false, error: 'Failed to fetch PR details for PR #' + pr.number };
+            try {
+                jira_post_comment({
+                    key: ticketKey,
+                    comment: 'h3. ⚠️ PR Review Setup Failed\n\nCould not fetch details for PR #' + pr.number + '.\n\n_Review cancelled._'
+                });
+            } catch (e) {}
+            return false;
         }
 
         // Step 4: Checkout PR branch
@@ -105,7 +111,7 @@ function action(params) {
                 comment: 'h3. ❌ PR Review Setup Error\n\n{code}' + error.toString() + '{code}'
             });
         } catch (e) {}
-        return { success: false, error: error.toString() };
+        return false;
     }
 }
 
