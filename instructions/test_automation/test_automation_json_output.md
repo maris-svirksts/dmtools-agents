@@ -27,7 +27,7 @@ After running the test, write the structured result to `outputs/test_automation_
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `status` | always | `"passed"` or `"failed"` |
+| `status` | always | `"passed"` or `"failed"` — **must be exactly lowercase, never `"PASSED"` or `"FAILED"`** |
 | `bug.summary` | if failed | Short bug title. Format: `Bug: <what failed>` |
 | `bug.description` | if failed | Path to the bug description file you must create |
 | `bug.priority` | if failed | `High`, `Medium`, or `Low` (see priority rules below) |
