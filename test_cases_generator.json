@@ -5,7 +5,7 @@
     "testCasesPriorities" : "High, Medium, Low",
     "outputType" : "creation",
     "testCaseIssueType" : "Test Case",
-    "existingTestCasesJql" : "project = JD AND issuetype = 'Test Case'",
+    "existingTestCasesJql" : "project = MYTUBE AND issuetype = 'Test Case'",
     "testCaseLinkRelationship" : "relates to",
     "isFindRelated" : true,
     "isGenerateNew" : true,
