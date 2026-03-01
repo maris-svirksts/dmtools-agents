@@ -243,8 +243,8 @@ function action(params) {
                 if (bugKey) {
                     try {
                         jira_link_issues({
-                            from: ticketKey,
-                            to: bugKey,
+                            sourceKey: ticketKey,
+                            anotherKey: bugKey,
                             relationship: 'is blocked by'
                         });
                         console.log('✅ Linked', ticketKey, 'is blocked by', bugKey);

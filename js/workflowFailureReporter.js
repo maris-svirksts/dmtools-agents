@@ -121,7 +121,7 @@ function action(params) {
             // 6. Link bug to ticket if detected
             if (ticketKey) {
                 try {
-                    jira_link_issues({ from: ticketKey, to: newKey, relationship: 'is blocked by' });
+                    jira_link_issues({ sourceKey: ticketKey, anotherKey: newKey, relationship: 'is blocked by' });
                     console.log('  🔗 Linked ' + ticketKey + ' is blocked by ' + newKey);
                 } catch (e) {
                     console.warn('  ⚠️  Failed to link ' + newKey + ' to ' + ticketKey + ': ' + (e.message || e));
