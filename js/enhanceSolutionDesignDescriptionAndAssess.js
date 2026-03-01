@@ -6,7 +6,7 @@
 
 // Import common helper functions
 const { assignForReview, extractTicketKey } = require('./common/jiraHelpers.js');
-const { LABELS, DIAGRAM_DEFAULTS, DIAGRAM_FORMAT, JIRA_FIELDS } = require('./config.js');
+const { STATUSES, LABELS, DIAGRAM_DEFAULTS, DIAGRAM_FORMAT, JIRA_FIELDS } = require('./config.js');
 
 /**
  * Read enhancement data from separate files
@@ -140,7 +140,7 @@ function action(params) {
         const updateResults = updateSDCoreTicket(ticketKey, enhancementData);
 
         // Use common assignForReview function for post-processing
-        const assignResult = assignForReview(ticketKey, initiatorId, wipLabel);
+        const assignResult = assignForReview(ticketKey, initiatorId, wipLabel, STATUSES.READY_FOR_DEVELOPMENT);
 
         if (!assignResult.success) {
             return assignResult;

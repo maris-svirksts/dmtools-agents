@@ -5,6 +5,7 @@
 
 // Import common Jira helper functions
 const { assignForReview } = require('./common/jiraHelpers.js');
+const { STATUSES } = require('./config.js');
 
 function action(params) {
     try {
@@ -16,7 +17,7 @@ function action(params) {
             : null;
         
         // Use common assignForReview function
-        return assignForReview(ticketKey, initiatorId, wipLabel);
+        return assignForReview(ticketKey, initiatorId, wipLabel, STATUSES.SOLUTION_ARCHITECTURE);
         
     } catch (error) {
         console.error("❌ Error:", error);

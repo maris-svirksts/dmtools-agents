@@ -14,20 +14,21 @@ const { STATUSES, LABELS } = require('../config.js');
  * @param {string} wipLabel - Optional WIP label to remove after processing
  * @returns {Object} Result object with success status and message
  */
-function assignForReview(ticketKey, initiatorId, wipLabel) {
+function assignForReview(ticketKey, initiatorId, wipLabel, targetStatus) {
+    const statusName = targetStatus || STATUSES.IN_REVIEW;
     try {
         console.log("Processing ticket:", ticketKey);
-        
+
         // Assign to initiator
         jira_assign_ticket_to({
             key: ticketKey,
             accountId: initiatorId
         });
-        
-        // Move to In Review status
+
+        // Move to target status
         jira_move_to_status({
             key: ticketKey,
-            statusName: STATUSES.IN_REVIEW
+            statusName: statusName
         });
 
         // Add AI-generated label
@@ -35,7 +36,7 @@ function assignForReview(ticketKey, initiatorId, wipLabel) {
             key: ticketKey,
             label: LABELS.AI_GENERATED
         });
-        
+
         // Remove WIP label if provided
         if (wipLabel) {
             try {
@@ -48,14 +49,14 @@ function assignForReview(ticketKey, initiatorId, wipLabel) {
                 console.warn('Failed to remove WIP label "' + wipLabel + '":', labelError);
             }
         }
-        
-        console.log("✅ Assigned to initiator and moved to In Review");
-        
+
+        console.log('✅ Assigned to initiator and moved to ' + statusName);
+
         return {
             success: true,
-            message: `Ticket ${ticketKey} assigned and moved to In Review`
+            message: 'Ticket ' + ticketKey + ' assigned and moved to ' + statusName
         };
-        
+
     } catch (error) {
         console.error("❌ Error in assignForReview:", error);
         return {
