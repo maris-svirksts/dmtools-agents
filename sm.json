@@ -1,7 +1,7 @@
 {
   "name" : "JSRunner",
   "params" : {
-    "script" : "agents/js/smAgent.js",
+    "jsPath" : "agents/js/smAgent.js",
     "owner"  : "ai-teammate",
     "repo"   : "mytube",
     "rules"  : [
