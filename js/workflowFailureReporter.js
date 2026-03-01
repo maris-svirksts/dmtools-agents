@@ -93,13 +93,7 @@ function action(params) {
             '*Run ID:* ' + runId;
 
         try {
-            var result = jira_create_ticket({
-                project:     jiraProject,
-                summary:     summary,
-                description: description,
-                issuetype:   'Bug',
-                priority:    'High'
-            });
+            var result = jira_create_ticket_basic(jiraProject, 'Bug', summary, description);
             var newKey = result && result.key ? result.key : null;
 
             if (!newKey) {
