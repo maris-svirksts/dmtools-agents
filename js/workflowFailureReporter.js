@@ -87,6 +87,26 @@ function action(params) {
             console.log('  🎫 Detected ticket: ' + ticketKey);
         }
 
+        // 3b. If ticket detected — skip if open bug already exists for this ticket
+        if (ticketKey) {
+            var ticketLabel = 'ci-ticket-' + ticketKey;
+            var openBug = [];
+            try {
+                openBug = jira_search_by_jql({
+                    jql:    'project = ' + jiraProject + ' AND issuetype = Bug AND labels = "' + ticketLabel + '" AND statusCategory != Done',
+                    limit:  1,
+                    fields: ['key', 'status']
+                }) || [];
+            } catch (e) {
+                console.warn('  ⚠️  JQL search for open ticket bug failed: ' + (e.message || e));
+            }
+            if (openBug.length > 0) {
+                console.log('  ⏭️  ' + ticketKey + ' — open bug already exists (' + openBug[0].key + '), skipping run ' + runId);
+                skipped++;
+                continue;
+            }
+        }
+
         // 4. Create bug
         var runWorkflow = (run.name || workflowId || 'unknown');
         var summary = 'Failed CI: ' + run.name + ' #' + run.run_number +
@@ -118,13 +138,18 @@ function action(params) {
                 console.warn('  ⚠️  Failed to add label ' + label + ' to ' + newKey + ': ' + (e.message || e));
             }
 
-            // 6. Link bug to ticket if detected
+            // 6. Link bug to ticket if detected + add ci-ticket label for dedup
             if (ticketKey) {
                 try {
                     jira_link_issues({ sourceKey: ticketKey, anotherKey: newKey, relationship: 'is blocked by' });
                     console.log('  🔗 Linked ' + ticketKey + ' is blocked by ' + newKey);
                 } catch (e) {
                     console.warn('  ⚠️  Failed to link ' + newKey + ' to ' + ticketKey + ': ' + (e.message || e));
+                }
+                try {
+                    jira_add_label({ key: newKey, label: 'ci-ticket-' + ticketKey });
+                } catch (e) {
+                    console.warn('  ⚠️  Failed to add ci-ticket label to ' + newKey + ': ' + (e.message || e));
                 }
             }
 
