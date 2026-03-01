@@ -7,8 +7,12 @@
  * customParams:
  *   workspace    — GitHub owner/org       (e.g. "ai-teammate")
  *   repository   — GitHub repo name       (e.g. "mytube")
- *   workflowId   — workflow filename      (e.g. "ai-teammate.yml")
+ *   workflowId   — workflow filename      (optional, e.g. "ai-teammate.yml"; omit for all workflows)
  *   jiraProject  — Jira project key       (e.g. "MYTUBE")
+ *
+ * NOTE: Listing runs without workflowId requires dmtools to support the /actions/runs endpoint.
+ * If you get a 404 when workflowId is omitted, please report to dmtools:
+ * https://github.com/IstiN/dmtools/issues
  */
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
@@ -17,17 +21,20 @@ function action(params) {
     var custom      = params.jobParams.customParams;
     var workspace   = custom.workspace;
     var repository  = custom.repository;
-    var workflowId  = custom.workflowId;
+    var workflowId  = custom.workflowId || null;   // optional — null means all workflows
     var jiraProject = custom.jiraProject;
 
-    if (!workspace || !repository || !workflowId || !jiraProject) {
-        console.error('❌ customParams must include workspace, repository, workflowId, jiraProject');
+    if (!workspace || !repository || !jiraProject) {
+        console.error('❌ customParams must include workspace, repository, jiraProject');
         return { success: false, error: 'Missing required customParams' };
     }
 
-    console.log('Workflow Failure Reporter — ' + workspace + '/' + repository + ' [' + workflowId + ']');
+    console.log('Workflow Failure Reporter — ' + workspace + '/' + repository +
+        (workflowId ? ' [' + workflowId + ']' : ' [all workflows]'));
 
     // 1. Get failed runs
+    // NOTE: github_list_workflow_runs with null workflowId should use /actions/runs endpoint.
+    // If dmtools doesn't support this yet, a 404/error will be thrown.
     var runsRaw = github_list_workflow_runs(workspace, repository, 'failure', workflowId, 50);
     var runs;
     try {
@@ -73,10 +80,12 @@ function action(params) {
         }
 
         // 3. Create bug
-        var summary = 'Failed CI: ' + run.name + ' #' + run.run_number + ' [' + workflowId + ']';
+        var runWorkflow = (run.name || workflowId || 'unknown');
+        var summary = 'Failed CI: ' + run.name + ' #' + run.run_number +
+            (workflowId ? ' [' + workflowId + ']' : '');
         var description =
             'GitHub Actions workflow run failed.\n\n' +
-            '*Workflow:* ' + workflowId + '\n' +
+            '*Workflow:* ' + runWorkflow + '\n' +
             '*Run:* ' + run.name + ' #' + run.run_number + '\n' +
             '*Branch:* ' + (run.head_branch || 'unknown') + '\n' +
             '*Commit:* ' + (run.head_sha ? run.head_sha.substring(0, 7) : 'unknown') + '\n' +

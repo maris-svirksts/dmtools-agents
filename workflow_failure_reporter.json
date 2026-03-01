@@ -6,7 +6,6 @@
       "customParams" : {
         "workspace"   : "ai-teammate",
         "repository"  : "mytube",
-        "workflowId"  : "ai-teammate.yml",
         "jiraProject" : "MYTUBE"
       }
     }
