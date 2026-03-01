@@ -485,7 +485,17 @@ function action(params) {
             console.warn('Failed to remove WIP label:', error);
         }
 
-        // Step 10: Assign back to initiator
+        // Step 10: Remove SM idempotency label (via customParams)
+        const customParams = params.jobParams && params.jobParams.customParams;
+        const removeLabel = customParams && customParams.removeLabel;
+        if (removeLabel) {
+            try {
+                jira_remove_label({ key: ticketKey, label: removeLabel });
+                console.log('✅ Removed SM label:', removeLabel);
+            } catch (e) {}
+        }
+
+        // Step 11: Assign back to initiator
         try {
             if (params.initiator) {
                 jira_assign_ticket_to({

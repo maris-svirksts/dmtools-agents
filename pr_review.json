@@ -27,6 +27,9 @@
     "preJSAction" : "agents/js/checkWipLabel.js",
     "preCliJSAction" : "agents/js/preparePRForReview.js",
     "postJSAction" : "agents/js/postPRReviewComments.js",
+    "customParams" : {
+      "removeLabel" : "sm_story_review_triggered"
+    },
     "inputJql" : "key = JD-107"
   }
 }

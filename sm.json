@@ -7,6 +7,13 @@
       "repo"  : "mytube",
       "rules" : [
         {
+          "description" : "In Review Stories → trigger pr_review",
+          "jql"         : "project = MYTUBE AND issuetype in ('Story') AND status in ('In Review')",
+          "configFile"  : "agents/pr_review.json",
+          "skipIfLabel" : "sm_story_review_triggered",
+          "addLabel"    : "sm_story_review_triggered"
+        },
+        {
           "description" : "Merged Stories → Ready For Testing + generate test cases",
           "jql"         : "project = MYTUBE AND issuetype in ('Story') AND status in ('Merged')",
           "targetStatus": "Ready For Testing",
