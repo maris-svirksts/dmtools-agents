@@ -121,21 +121,21 @@ function processRule(rule, repoInfo, ruleIndex) {
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 function action(params) {
-    var rules = params.rules;
+    var p     = params.jobParams || params;
+    var rules = p.rules;
 
     if (!rules || rules.length === 0) {
-        console.error('❌ No rules defined in params.rules');
+        console.error('❌ No rules defined in jobParams.rules');
         return { success: false, error: 'No rules defined' };
     }
 
-    if (!params.owner || !params.repo) {
-        console.error('❌ params.owner and params.repo are required');
+    if (!p.owner || !p.repo) {
+        console.error('❌ jobParams.owner and jobParams.repo are required');
         return { success: false, error: 'Missing owner or repo' };
     }
 
-    var repoInfo = { owner: params.owner, repo: params.repo };
-    console.log('SM Agent — ' + repoInfo.owner + '/' + repoInfo.repo);
-    console.log('Rules to process: ' + rules.length);
+    var repoInfo = { owner: p.owner, repo: p.repo };
+    console.log('SM Agent — ' + repoInfo.owner + '/' + repoInfo.repo + ' (' + rules.length + ' rules)');
 
     var totalProcessed = 0;
     var totalSkipped   = 0;

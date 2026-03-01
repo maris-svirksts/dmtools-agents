@@ -1,18 +1,20 @@
 {
   "name" : "JSRunner",
   "params" : {
-    "jsPath" : "agents/js/smAgent.js",
-    "owner"  : "ai-teammate",
-    "repo"   : "mytube",
-    "rules"  : [
-      {
-        "description" : "Merged Stories → Ready For Testing + generate test cases",
-        "jql"         : "project = MYTUBE AND issuetype in ('Story') AND status in ('Merged')",
-        "targetStatus": "Ready For Testing",
-        "configFile"  : "agents/test_cases_generator.json",
-        "skipIfLabel" : "sm_test_cases_triggered",
-        "addLabel"    : "sm_test_cases_triggered"
-      }
-    ]
+    "jsPath"    : "agents/js/smAgent.js",
+    "jobParams" : {
+      "owner" : "ai-teammate",
+      "repo"  : "mytube",
+      "rules" : [
+        {
+          "description" : "Merged Stories → Ready For Testing + generate test cases",
+          "jql"         : "project = MYTUBE AND issuetype in ('Story') AND status in ('Merged')",
+          "targetStatus": "Ready For Testing",
+          "configFile"  : "agents/test_cases_generator.json",
+          "skipIfLabel" : "sm_test_cases_triggered",
+          "addLabel"    : "sm_test_cases_triggered"
+        }
+      ]
+    }
   }
 }
