@@ -142,28 +142,30 @@ function performGitOperations(branchName, commitMessage) {
             command: 'git commit -m "' + commitMessage.replace(/"/g, '\\"') + '"'
         });
 
-        // Push to remote with force flag if branch exists
-        // Using --force to handle the case where branch exists remotely
+        // Push to remote
         console.log('Pushing to remote...');
-        try {
-            cli_execute_command({
-                command: 'git push -u origin ' + branchName
-            });
-        } catch (pushError) {
-            // If push fails, try with force (in case branch exists remotely)
-            console.log('Normal push failed, attempting force push...');
-            cli_execute_command({
-                command: 'git push -u origin ' + branchName + ' --force'
-            });
+        const pushOutput = cli_execute_command({
+            command: 'git push -u origin ' + branchName
+        }) || '';
+
+        // cli_execute_command exits 0 even for rejected pushes — check output for errors
+        const pushFailed = pushOutput.indexOf('remote rejected') !== -1 ||
+                           pushOutput.indexOf('GH013') !== -1 ||
+                           pushOutput.indexOf('error: failed to push') !== -1 ||
+                           pushOutput.indexOf('push declined') !== -1;
+
+        if (pushFailed) {
+            throw new Error('Push was rejected by remote: ' + pushOutput.substring(0, 500));
         }
 
-        // Verify branch is pushed
+        // Verify branch is actually present on remote
         console.log('Verifying branch is pushed to remote...');
-        const remoteBranches = cli_execute_command({
+        const lsRemoteOutput = cli_execute_command({
             command: 'git ls-remote --heads origin ' + branchName
         }) || '';
 
-        if (!remoteBranches.trim()) {
+        // ls-remote stdout contains refs/heads/<branch> when the branch exists
+        if (lsRemoteOutput.indexOf('refs/heads/' + branchName) === -1) {
             throw new Error('Branch was not successfully pushed to remote');
         }
 
