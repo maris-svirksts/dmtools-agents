@@ -73,10 +73,12 @@ Before writing a test, check what is already available in GitHub Actions. **You 
 - Frontend: `https://ai-teammate.github.io/mytube` (default — no env var needed)
 - API: `https://mytube-api-80693608388.us-central1.run.app`
 
+### Also available
+- `RAW_OBJECT_PATH` = `test-videos/test_video.mp4` — relative path within `gs://mytube-raw-uploads/` to a real test video for transcoder tests
+
 ### Not yet available (require human setup)
 - `FIREBASE_TEST_EMAIL` / `FIREBASE_TEST_PASSWORD` — dedicated test Firebase user
 - `FIREBASE_TEST_TOKEN` — generated at CI runtime from email+password (see `instruction.md`)
-- `RAW_OBJECT_PATH` — path to a real raw video in GCS (e.g. `gs://mytube-raw-uploads/test-video/raw.mp4`)
 
 ---
 
