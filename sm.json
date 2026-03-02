@@ -7,6 +7,13 @@
       "repo"  : "mytube",
       "rules" : [
         {
+          "description" : "PO Review Stories with all subtasks Done → BA Analysis",
+          "jql"         : "project = MYTUBE AND issuetype in ('Story') AND status in ('PO Review')",
+          "configFile"  : "agents/story_ba_check.json",
+          "skipIfLabel" : "sm_story_ba_check_triggered",
+          "addLabel"    : "sm_story_ba_check_triggered"
+        },
+        {
           "description" : "Subtasks with 'q' label → trigger PO refinement",
           "jql"         : "project = MYTUBE AND issuetype in ('Subtask') AND labels in ('q')",
           "configFile"  : "agents/po_refinement.json",
