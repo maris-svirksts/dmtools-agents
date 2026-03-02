@@ -155,7 +155,11 @@ function performGitOperations(branchName, commitMessage) {
                            pushOutput.indexOf('push declined') !== -1;
 
         if (pushFailed) {
-            throw new Error('Push was rejected by remote: ' + pushOutput.substring(0, 500));
+            return {
+                success: false,
+                isPushFailure: true,
+                error: 'Push was rejected by remote: ' + pushOutput.substring(0, 500)
+            };
         }
 
         // Verify branch is actually present on remote
@@ -166,7 +170,11 @@ function performGitOperations(branchName, commitMessage) {
 
         // ls-remote stdout contains refs/heads/<branch> when the branch exists
         if (lsRemoteOutput.indexOf('refs/heads/' + branchName) === -1) {
-            throw new Error('Branch was not successfully pushed to remote');
+            return {
+                success: false,
+                isPushFailure: true,
+                error: 'Branch was not found on remote after push'
+            };
         }
 
         console.log('✅ Git operations completed successfully');
@@ -343,6 +351,73 @@ function postErrorCommentToJira(ticketKey, stage, errorMessage) {
 }
 
 /**
+ * Retry push after asking the agent to fix the commit
+ * Used when push is rejected (e.g. GitHub push protection blocked a secret)
+ *
+ * @param {string} ticketKey - Jira ticket key
+ * @param {string} branchName - Branch name to push
+ * @param {string} pushError - Error message from the failed push
+ * @returns {Object} Result with success status
+ */
+function retryAfterPushFailure(ticketKey, branchName, pushError) {
+    console.log('Push failed — asking agent to fix commit and retrying...');
+
+    // Write error details for the agent
+    const errorFilePath = 'input/' + ticketKey + '/push_error.md';
+    try {
+        file_write({
+            path: errorFilePath,
+            content: '# Push Error — Please Fix\n\n' +
+                'The git push was rejected. Error:\n\n```\n' + pushError + '\n```\n\n' +
+                '**What to do:**\n' +
+                '1. Identify what caused the push to be rejected (e.g. a secret/credentials file in the commit)\n' +
+                '2. Remove it from the commit:\n' +
+                '   ```\n' +
+                '   git rm --cached <filename>\n' +
+                '   git commit --amend --no-edit\n' +
+                '   ```\n' +
+                '3. Do NOT push — just fix the commit history\n'
+        });
+        console.log('Wrote push error to', errorFilePath);
+    } catch (e) {
+        console.warn('Could not write push_error.md:', e);
+    }
+
+    // Re-invoke the agent with --continue --resume to fix the commit
+    var fixPrompt = 'The git push failed. I have written the details in ' + errorFilePath +
+        ' — please read it and fix the commit. Do NOT push.';
+    console.log('Re-invoking agent with --continue --resume...');
+    try {
+        cli_execute_command({
+            command: './agents/scripts/run-agent.sh --continue --resume "' + fixPrompt.replace(/"/g, '\\"') + '"'
+        });
+    } catch (e) {
+        return { success: false, error: 'Agent fix attempt failed: ' + e.toString() };
+    }
+
+    // Retry push
+    console.log('Retrying push after agent fix...');
+    var retryOutput = cli_execute_command({ command: 'git push -u origin ' + branchName }) || '';
+    var retryFailed = retryOutput.indexOf('remote rejected') !== -1 ||
+                      retryOutput.indexOf('GH013') !== -1 ||
+                      retryOutput.indexOf('error: failed to push') !== -1 ||
+                      retryOutput.indexOf('push declined') !== -1;
+
+    if (retryFailed) {
+        return { success: false, error: 'Push still rejected after agent fix: ' + retryOutput.substring(0, 300) };
+    }
+
+    // Verify branch is on remote
+    var lsOutput = cli_execute_command({ command: 'git ls-remote --heads origin ' + branchName }) || '';
+    if (lsOutput.indexOf('refs/heads/' + branchName) === -1) {
+        return { success: false, error: 'Branch not found on remote after retry push' };
+    }
+
+    console.log('✅ Push succeeded after agent fix');
+    return { success: true };
+}
+
+/**
  * Main action function - orchestrates the entire workflow
  *
  * @param {Object} params - Parameters from Teammate job
@@ -394,11 +469,18 @@ function action(params) {
         // Perform git operations
         const gitResult = performGitOperations(branchName, commitMessage);
         if (!gitResult.success) {
-            postErrorCommentToJira(ticketKey, 'Git Operations', gitResult.error);
-            return {
-                success: false,
-                error: 'Git operations failed: ' + gitResult.error
-            };
+            if (gitResult.isPushFailure) {
+                // Push was rejected — ask the agent to fix the commit, then retry
+                const retryResult = retryAfterPushFailure(ticketKey, branchName, gitResult.error);
+                if (!retryResult.success) {
+                    postErrorCommentToJira(ticketKey, 'Git Push (after retry)', retryResult.error);
+                    return { success: false, error: 'Git push failed even after retry: ' + retryResult.error };
+                }
+                // Push succeeded after agent fix — continue to PR creation
+            } else {
+                postErrorCommentToJira(ticketKey, 'Git Operations', gitResult.error);
+                return { success: false, error: 'Git operations failed: ' + gitResult.error };
+            }
         }
 
         // Verify outputs/response.md exists (must be created by cursor-agent or workflow)

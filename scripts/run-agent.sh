@@ -18,7 +18,8 @@ Example:
 
 Notes:
   - Provide the prompt as a single argument
-  - For cursor: all extra arguments before the prompt are passed through to cursor-agent
+  - Extra arguments before the prompt are passed through to the agent (cursor and codemie)
+  - Useful for resume: $(basename "$0") --continue --resume "fix the push error"
   - For codemie: requires CODEMIE_API_KEY and CODEMIE_BASE_URL environment variables
   - For copilot: requires COPILOT_GITHUB_TOKEN or GITHUB_TOKEN environment variable
   - Final response is written to outputs/response.md
@@ -69,6 +70,13 @@ if [ -z "$PROMPT" ]; then
   exit 1
 fi
 
+# Extract extra arguments (everything except the last — the prompt)
+# These are passed through to the agent to support flags like --continue --resume
+PASS_ARGS=()
+if [ $# -gt 1 ]; then
+  PASS_ARGS=("${@:1:$#-1}")
+fi
+
 # Determine provider
 PROVIDER="${AI_AGENT_PROVIDER:-cursor}"
 echo "AI Agent Provider: $PROVIDER"
@@ -89,15 +97,28 @@ if [ "$PROVIDER" = "codemie" ]; then
   echo "  Model: ${CODEMIE_MODEL:-claude-4-5-sonnet}"
   echo "  Max Turns: ${CODEMIE_MAX_TURNS:-50}"
 
-  CMD=(codemie-claude
-    --base-url "${CODEMIE_BASE_URL}"
-    --api-key "${CODEMIE_API_KEY}"
-    --model "${CODEMIE_MODEL:-claude-4-5-sonnet}"
-    --provider "litellm"
-    -p "$PROMPT"
-    --max-turns "${CODEMIE_MAX_TURNS:-50}"
-    --dangerously-skip-permissions
-    --allowedTools "Bash(*),Read(*),Curl(*)")
+  if [ ${#PASS_ARGS[@]} -eq 0 ]; then
+    CMD=(codemie-claude
+      --base-url "${CODEMIE_BASE_URL}"
+      --api-key "${CODEMIE_API_KEY}"
+      --model "${CODEMIE_MODEL:-claude-4-5-sonnet}"
+      --provider "litellm"
+      -p "$PROMPT"
+      --max-turns "${CODEMIE_MAX_TURNS:-50}"
+      --dangerously-skip-permissions
+      --allowedTools "Bash(*),Read(*),Curl(*)")
+  else
+    CMD=(codemie-claude
+      --base-url "${CODEMIE_BASE_URL}"
+      --api-key "${CODEMIE_API_KEY}"
+      --model "${CODEMIE_MODEL:-claude-4-5-sonnet}"
+      --provider "litellm"
+      "${PASS_ARGS[@]}"
+      -p "$PROMPT"
+      --max-turns "${CODEMIE_MAX_TURNS:-50}"
+      --dangerously-skip-permissions
+      --allowedTools "Bash(*),Read(*),Curl(*)")
+  fi
 
 elif [ "$PROVIDER" = "copilot" ]; then
   # Export COPILOT_GITHUB_TOKEN if not set but GITHUB_TOKEN is available
@@ -122,12 +143,6 @@ else
   if ! command -v cursor-agent >/dev/null 2>&1; then
     echo "Error: cursor-agent not found in PATH" >&2
     exit 127
-  fi
-
-  # Get all arguments except the last one (the prompt)
-  PASS_ARGS=()
-  if [ $# -gt 1 ]; then
-    PASS_ARGS=("${@:1:$#-1}")
   fi
 
   # Build command with defaults if no options provided
