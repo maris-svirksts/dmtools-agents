@@ -35,6 +35,14 @@ Implement code changes based on ticket requirements including:
   - Fails the PR check if any tests fail
   Match the language/build tool already used in the project (e.g. npm test, mvn test, gradle test, pytest, etc.)
 
+**IMPORTANT**: Before finishing, run `git status` to review every new and modified file. Check for any sensitive files that must NOT be committed:
+- Credential / service-account files (`gha-creds-*.json`, `*-credentials.json`, `*.pem`, `*.key`, `id_rsa`, `keystore.*`)
+- Environment files (`.env`, `.env.*`, `*.env`)
+- Token files (`*.token`, `*.secret`)
+- Any file created by tools, test runners, or the OS that is not part of the codebase (e.g. `__pycache__`, `.DS_Store`, temp auth files)
+
+For each such file found: **add the appropriate pattern to `.gitignore`** before finishing. The post-processing step runs `git add .` — every untracked file in the working tree will be staged and committed.
+
 DO NOT create git branches, commit, or push changes - this is handled by post-processing function
 
 Write a short (no water words) development summary to outputs/response.md with the following:

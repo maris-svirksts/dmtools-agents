@@ -81,6 +81,16 @@ This TDD approach ensures:
 2. Run the full test suite — no regressions
 3. If any existing tests break, investigate: either the test was wrong or the fix is too broad
 
+## Step 7 — Check Git Status for Secrets
+
+Before finishing, run `git status` to review every new and modified file. Check for any sensitive files that must NOT be committed:
+- Credential / service-account files (`gha-creds-*.json`, `*-credentials.json`, `*.pem`, `*.key`, `id_rsa`, `keystore.*`)
+- Environment files (`.env`, `.env.*`, `*.env`)
+- Token files (`*.token`, `*.secret`)
+- Any file created by tools, test runners, or the OS that is not part of the codebase
+
+For each such file found: **add the appropriate pattern to `.gitignore`** before finishing. The post-processing step runs `git add .` — every untracked file in the working tree will be staged and committed.
+
 ## Output — `outputs/response.md`
 
 For a normal fix, write:
