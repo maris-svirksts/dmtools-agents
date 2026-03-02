@@ -16,6 +16,7 @@
  *   workflowRef  (optional) — git ref for dispatch           (default: main)
  *   skipIfLabel  (optional) — skip ticket if it already has this label (idempotency)
  *   addLabel     (optional) — add this label after triggering (idempotency marker)
+ *   enabled      (optional) — set to false to disable the rule entirely (default: true)
  */
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -69,6 +70,11 @@ function processRule(rule, repoInfo, ruleIndex) {
     var label = rule.description || ('Rule #' + (ruleIndex + 1));
     console.log('\n══ ' + label + ' ══');
     console.log('   JQL: ' + rule.jql);
+
+    if (rule.enabled === false) {
+        console.log('  ⏸️  Rule disabled — skipping');
+        return { processedKeys: [], skippedKeys: [] };
+    }
 
     if (!rule.jql || !rule.configFile) {
         console.warn('  ⚠️  Skipping rule — jql and configFile are required');
