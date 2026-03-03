@@ -4,12 +4,12 @@
  * 2. Stages testing/ folder, commits, pushes, creates PR to main
  * 3. Posts Jira comment from outputs/response.md
  * 4. If passed:          moves ticket to In Review - Passed
- * 5. If failed:          creates Bug ticket, links it, moves Test Case to In Review - Failed
+ * 5. If failed:          moves Test Case to In Review - Failed (bug created by bug_creation agent on Failed)
  * 6. If blocked_by_human: moves ticket to Blocked, posts what credentials/data are needed
  * 7. Removes WIP label
  */
 
-const { GIT_CONFIG, STATUSES, ISSUE_TYPES, LABELS } = require('./config.js');
+const { GIT_CONFIG, STATUSES, LABELS } = require('./config.js');
 
 function cleanCommandOutput(output) {
     if (!output) return '';
@@ -147,29 +147,6 @@ function createPullRequest(title, branchName) {
     }
 }
 
-function createBugTicket(projectKey, bug) {
-    try {
-        const description = bug.description ? (readFile(bug.description) || bug.summary) : bug.summary;
-
-        const result = jira_create_ticket_basic(projectKey, ISSUE_TYPES.BUG, bug.summary, description);
-
-        var bugKey = null;
-        if (result) {
-            if (typeof result === 'string') {
-                var urlMatch = result.match(/\/browse\/([A-Z]+-\d+)/);
-                if (urlMatch) bugKey = urlMatch[1];
-            } else if (result.key) {
-                bugKey = result.key;
-            }
-        }
-        if (bugKey) console.log('✅ Created bug:', bugKey);
-        return bugKey;
-    } catch (e) {
-        console.error('Failed to create bug ticket:', e);
-        return null;
-    }
-}
-
 function action(params) {
     try {
         const ticketKey = params.ticket.key;
@@ -293,26 +270,7 @@ function action(params) {
                 console.warn('Failed to move to In Review - Passed:', e);
             }
         } else {
-            // Create bug ticket
-            const bug = result.bug;
-            if (bug && bug.summary) {
-                const bugKey = createBugTicket(projectKey, bug);
-                if (bugKey) {
-                    try {
-                        jira_link_issues({
-                            sourceKey: ticketKey,
-                            anotherKey: bugKey,
-                            relationship: 'is blocked by'
-                        });
-                        console.log('✅ Linked', ticketKey, 'is blocked by', bugKey);
-                    } catch (e) {
-                        console.warn('Failed to link bug:', e);
-                    }
-                }
-            } else {
-                console.warn('Test failed but no bug details in result JSON');
-            }
-
+            // Bug creation is handled by the bug_creation agent when TC reaches Failed status
             try {
                 jira_move_to_status({ key: ticketKey, statusName: STATUSES.IN_REVIEW_FAILED });
                 console.log('✅ Failed — moved', ticketKey, 'to', STATUSES.IN_REVIEW_FAILED);

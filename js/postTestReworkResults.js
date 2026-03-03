@@ -10,7 +10,7 @@
  * 7. Posts Jira comment, removes WIP label
  */
 
-const { GIT_CONFIG, STATUSES, ISSUE_TYPES, LABELS } = require('./config.js');
+const { GIT_CONFIG, STATUSES, LABELS } = require('./config.js');
 
 function cleanCommandOutput(output) {
     if (!output) return '';
@@ -164,24 +164,10 @@ function postThreadReplies(workspace, repository, pullRequestId) {
     return posted;
 }
 
-function createOrUpdateBug(projectKey, bug) {
-    try {
-        const description = bug.description ? (readFile(bug.description) || bug.summary) : bug.summary;
-        const result = jira_create_ticket_basic(projectKey, ISSUE_TYPES.BUG, bug.summary, description);
-        const bugKey = result && result.key ? result.key : null;
-        if (bugKey) console.log('✅ Created bug:', bugKey);
-        return bugKey;
-    } catch (e) {
-        console.error('Failed to create bug:', e);
-        return null;
-    }
-}
-
 function action(params) {
     try {
         const actualParams = params.ticket ? params : (params.jobParams || params);
         const ticketKey = actualParams.ticket.key;
-        const projectKey = ticketKey.split('-')[0];
         const fixSummary = actualParams.response || '_(No fix summary)_';
 
         console.log('=== Processing test rework results for', ticketKey, '===');
@@ -244,21 +230,8 @@ function action(params) {
             console.warn('No PR found — skipping GitHub PR comment');
         }
 
-        // Step 4: Handle test failure — create/update bug if newly failed
-        if (!passed && result.bug && result.bug.summary) {
-            const bugKey = createOrUpdateBug(projectKey, result.bug);
-            if (bugKey) {
-                try {
-                    jira_link_issues({
-                        sourceKey: ticketKey,
-                        anotherKey: bugKey,
-                        relationship: 'is blocked by'
-                    });
-                } catch (e) {}
-            }
-        }
-
-        // Step 5: Move ticket to In Review - Passed or In Review - Failed
+        // Step 4: Move ticket to In Review - Passed or In Review - Failed
+        // Bug creation/linking is handled by the bug_creation agent when TC reaches Failed status
         const targetStatus = passed ? STATUSES.IN_REVIEW_PASSED : STATUSES.IN_REVIEW_FAILED;
         try {
             jira_move_to_status({ key: ticketKey, statusName: targetStatus });

@@ -17,6 +17,7 @@
  *   skipIfLabel  (optional) — skip ticket if it already has this label (idempotency)
  *   addLabel     (optional) — add this label after triggering (idempotency marker)
  *   enabled      (optional) — set to false to disable the rule entirely (default: true)
+ *   limit        (optional) — max number of tickets to process per run (default: 50)
  */
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -69,7 +70,7 @@ function hasLabel(ticket, label) {
 function processRule(rule, repoInfo, ruleIndex) {
     var label = rule.description || ('Rule #' + (ruleIndex + 1));
     console.log('\n══ ' + label + ' ══');
-    console.log('   JQL: ' + rule.jql);
+    console.log('   JQL: ' + rule.jql + (rule.limit ? ' (limit: ' + rule.limit + ')' : ''));
 
     if (rule.enabled === false) {
         console.log('  ⏸️  Rule disabled — skipping');
@@ -81,9 +82,10 @@ function processRule(rule, repoInfo, ruleIndex) {
         return { processedKeys: [], skippedKeys: [] };
     }
 
+    var jqlLimit = typeof rule.limit === 'number' ? rule.limit : 50;
     var tickets = [];
     try {
-        tickets = jira_search_by_jql({ jql: rule.jql, limit: 50, fields: ['key', 'labels'] }) || [];
+        tickets = jira_search_by_jql({ jql: rule.jql, limit: jqlLimit, fields: ['key', 'labels'] }) || [];
     } catch (e) {
         console.error('  ❌ Jira query failed: ' + (e.message || e));
         return { processedKeys: [], skippedKeys: [] };
