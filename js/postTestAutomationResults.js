@@ -5,7 +5,8 @@
  * 3. Posts Jira comment from outputs/response.md
  * 4. If passed:          moves ticket to In Review - Passed
  * 5. If failed:          moves Test Case to In Review - Failed (bug created by bug_creation agent on Failed)
- * 6. If blocked_by_human: moves ticket to Blocked, posts what credentials/data are needed
+ * 6. If blocked_by_human: moves ticket to Blocked, posts what credentials/data are needed,
+ *                         removes SM trigger label so ticket is re-processed after human fix
  * 7. Removes WIP label
  */
 
@@ -257,6 +258,15 @@ function action(params) {
                 ? params.metadata.contextId + '_wip'
                 : 'test_case_automation_wip';
             try { jira_remove_label({ key: ticketKey, label: wipLabelBlocked }); } catch (e) {}
+
+            // Remove SM trigger label so the ticket is re-processed after human fixes the issue
+            const smTriggerLabel = params.jobParams && params.jobParams.customParams && params.jobParams.customParams.removeLabel;
+            if (smTriggerLabel) {
+                try {
+                    jira_remove_label({ key: ticketKey, label: smTriggerLabel });
+                    console.log('✅ Removed SM trigger label:', smTriggerLabel);
+                } catch (e) {}
+            }
 
             console.log('🚫 Test', ticketKey, 'blocked by human — awaiting credentials/data');
             return { success: true, status: 'blocked_by_human', ticketKey, prUrl };
