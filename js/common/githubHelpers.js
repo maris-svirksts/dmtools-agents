@@ -485,11 +485,19 @@ function detectFailedChecks(owner, repo, headSha, inputFolder) {
             var jobIdMatch = check.details_url && check.details_url.match(/\/jobs\/(\d+)/);
             if (jobIdMatch) {
                 try {
-                    var logs = github_get_job_logs({
+                    var rawLogs = github_get_job_logs({
                         workspace: owner,
                         repository: repo,
                         jobId: jobIdMatch[1]
                     });
+                    // Result may be JSON string with {result: "..."} wrapper
+                    var logs = rawLogs;
+                    if (typeof rawLogs === 'string') {
+                        try {
+                            var parsed = JSON.parse(rawLogs);
+                            if (parsed && parsed.result) logs = parsed.result;
+                        } catch (e) { /* use as-is */ }
+                    }
                     if (logs) {
                         // Trim to last 150 lines to keep the file readable
                         var lines = logs.split('\n');
