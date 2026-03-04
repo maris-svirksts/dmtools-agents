@@ -58,7 +58,12 @@ function checkoutBranch(ticketKey) {
         console.log('Branch exists locally, rebasing from main:', branchName);
         cli_execute_command({ command: 'git checkout ' + branchName });
         try {
-            cli_execute_command({ command: 'git rebase origin/' + GIT_CONFIG.DEFAULT_BASE_BRANCH });
+            var rebaseOutput = cleanCommandOutput(
+                cli_execute_command({ command: 'git rebase origin/' + GIT_CONFIG.DEFAULT_BASE_BRANCH }) || ''
+            );
+            if (rebaseOutput.indexOf('CONFLICT') !== -1) {
+                throw new Error('Rebase conflict detected: ' + rebaseOutput.substring(0, 200));
+            }
         } catch (rebaseErr) {
             console.warn('Rebase failed, resetting to main:', rebaseErr);
             try { cli_execute_command({ command: 'git rebase --abort' }); } catch (_) {}
@@ -77,7 +82,12 @@ function checkoutBranch(ticketKey) {
             console.log('Branch exists on remote, checking out and rebasing from main:', branchName);
             cli_execute_command({ command: 'git checkout -b ' + branchName + ' origin/' + branchName });
             try {
-                cli_execute_command({ command: 'git rebase origin/' + GIT_CONFIG.DEFAULT_BASE_BRANCH });
+                var rebaseOutput2 = cleanCommandOutput(
+                    cli_execute_command({ command: 'git rebase origin/' + GIT_CONFIG.DEFAULT_BASE_BRANCH }) || ''
+                );
+                if (rebaseOutput2.indexOf('CONFLICT') !== -1) {
+                    throw new Error('Rebase conflict detected: ' + rebaseOutput2.substring(0, 200));
+                }
             } catch (rebaseErr) {
                 console.warn('Rebase failed, resetting to main:', rebaseErr);
                 try { cli_execute_command({ command: 'git rebase --abort' }); } catch (_) {}
