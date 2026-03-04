@@ -59,7 +59,16 @@ function findPRForTicket(workspace, repository, ticketKey) {
             return openMatch[0];
         }
 
-        console.warn('No open PR found for ticket', ticketKey);
+        // Fall back to closed/merged PRs (ticket recycled back from Merged status)
+        console.warn('No open PR found, checking closed/merged PRs for ticket', ticketKey);
+        const closedPRs = github_list_prs({ workspace: workspace, repository: repository, state: 'closed' });
+        const closedMatch = closedPRs.filter(match);
+        if (closedMatch.length > 0) {
+            console.log('Found closed/merged PR #' + closedMatch[0].number + ':', closedMatch[0].title);
+            return closedMatch[0];
+        }
+
+        console.warn('No PR found (open or closed) for ticket', ticketKey);
         return null;
     } catch (e) {
         console.error('Failed to find PR for ticket:', e);
