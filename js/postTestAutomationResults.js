@@ -306,6 +306,16 @@ function action(params) {
             console.warn('Failed to remove WIP label:', e);
         }
 
+        // Step 9: Always remove SM trigger label so the TC can be re-triggered
+        // by adding the label again (re-run after pass, re-run after fix, etc.)
+        const smTriggerLabel = params.jobParams && params.jobParams.customParams && params.jobParams.customParams.removeLabel;
+        if (smTriggerLabel) {
+            try {
+                jira_remove_label({ key: ticketKey, label: smTriggerLabel });
+                console.log('✅ Removed SM trigger label:', smTriggerLabel);
+            } catch (e) {}
+        }
+
         console.log('✅ Test automation workflow complete:', passed ? 'PASSED' : 'FAILED');
 
         return {
