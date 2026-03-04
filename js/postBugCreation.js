@@ -36,11 +36,27 @@ function readDecisionJson() {
 
 function extractKeyFromResult(result) {
     if (!result) return null;
-    if (typeof result === 'string') {
-        var urlMatch = result.match(/\/browse\/([A-Z]+-\d+)/);
-        return urlMatch ? urlMatch[1] : null;
+    // If result is already an object with .key
+    if (typeof result === 'object') {
+        return result.key || null;
     }
-    return result.key || null;
+    if (typeof result === 'string') {
+        // Try parsing as JSON first (API often returns {"id":"...","key":"PROJ-123","self":"..."})
+        try {
+            var parsed = JSON.parse(result);
+            if (parsed && parsed.key) return parsed.key;
+        } catch (e) { /* not JSON, try regex */ }
+        // Try /browse/KEY URL pattern
+        var urlMatch = result.match(/\/browse\/([A-Z]+-\d+)/);
+        if (urlMatch) return urlMatch[1];
+        // Try "key":"PROJ-123" pattern anywhere in string
+        var keyMatch = result.match(/"key"\s*:\s*"([A-Z]+-\d+)"/);
+        if (keyMatch) return keyMatch[1];
+        // Try bare PROJ-123 pattern as last resort
+        var bareMatch = result.match(/\b([A-Z]+-\d+)\b/);
+        if (bareMatch) return bareMatch[1];
+    }
+    return null;
 }
 
 function linkBugToTC(ticketKey, bugKey) {
@@ -114,6 +130,7 @@ function action(params) {
             try {
                 var projectKey = ticketKey.split('-')[0];
                 var result = jira_create_ticket_basic(projectKey, 'Bug', summary, description);
+                console.log('jira_create_ticket_basic result:', typeof result, JSON.stringify(result));
                 bugKey = extractKeyFromResult(result);
 
                 if (bugKey) {
