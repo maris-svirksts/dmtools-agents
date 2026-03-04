@@ -55,8 +55,15 @@ function checkoutBranch(ticketKey) {
     }
 
     if (localBranches.trim()) {
-        console.log('Branch exists locally, checking out:', branchName);
+        console.log('Branch exists locally, rebasing from main:', branchName);
         cli_execute_command({ command: 'git checkout ' + branchName });
+        try {
+            cli_execute_command({ command: 'git rebase origin/' + GIT_CONFIG.DEFAULT_BASE_BRANCH });
+        } catch (rebaseErr) {
+            console.warn('Rebase failed, resetting to main:', rebaseErr);
+            try { cli_execute_command({ command: 'git rebase --abort' }); } catch (_) {}
+            cli_execute_command({ command: 'git reset --hard origin/' + GIT_CONFIG.DEFAULT_BASE_BRANCH });
+        }
     } else {
         var remoteBranches = '';
         try {
@@ -67,8 +74,15 @@ function checkoutBranch(ticketKey) {
         }
 
         if (remoteBranches.trim()) {
-            console.log('Branch exists on remote, checking out with tracking:', branchName);
+            console.log('Branch exists on remote, checking out and rebasing from main:', branchName);
             cli_execute_command({ command: 'git checkout -b ' + branchName + ' origin/' + branchName });
+            try {
+                cli_execute_command({ command: 'git rebase origin/' + GIT_CONFIG.DEFAULT_BASE_BRANCH });
+            } catch (rebaseErr) {
+                console.warn('Rebase failed, resetting to main:', rebaseErr);
+                try { cli_execute_command({ command: 'git rebase --abort' }); } catch (_) {}
+                cli_execute_command({ command: 'git reset --hard origin/' + GIT_CONFIG.DEFAULT_BASE_BRANCH });
+            }
         } else {
             console.log('Creating new branch from', GIT_CONFIG.DEFAULT_BASE_BRANCH + ':', branchName);
             cli_execute_command({ command: 'git checkout ' + GIT_CONFIG.DEFAULT_BASE_BRANCH });

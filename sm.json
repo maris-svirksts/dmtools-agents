@@ -54,7 +54,7 @@
           "configFile"  : "agents/bug_development.json",
           "skipIfLabel" : "sm_bug_development_triggered",
           "addLabel"    : "sm_bug_development_triggered",
-          "enabled"     : false
+          "enabled"     : true
         },
         {
           "description" : "In Review Stories & Bugs → trigger pr_review",
@@ -85,7 +85,8 @@
           "configFile"  : "agents/bug_merged.json",
           "skipIfLabel" : "sm_bug_merged_triggered",
           "addLabel"    : "sm_bug_merged_triggered",
-          "enabled"     : false
+          "enabled"     : false,
+          "limit"       : 1
         },
         {
           "description" : "Ready For Testing Bugs → generate test cases",
