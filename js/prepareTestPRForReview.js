@@ -17,10 +17,20 @@ function findTestPRForTicket(workspace, repository, ticketKey) {
         });
         if (openMatch.length > 0) {
             console.log('Found open test PR #' + openMatch[0].number);
-            return openMatch[0];
+            return { pr: openMatch[0], merged: false };
         }
 
-        console.warn('No open PR found for test branch:', branchName);
+        // No open PR — check if it was already merged
+        const closedPRs = github_list_prs({ workspace: workspace, repository: repository, state: 'closed' });
+        const mergedMatch = closedPRs.filter(function(pr) {
+            return pr.head && pr.head.ref && pr.head.ref === branchName && pr.merged_at;
+        });
+        if (mergedMatch.length > 0) {
+            console.log('Found already-merged test PR #' + mergedMatch[0].number);
+            return { pr: mergedMatch[0], merged: true };
+        }
+
+        console.warn('No PR found for test branch:', branchName);
         return null;
     } catch (e) {
         console.error('Failed to find test PR:', e);
@@ -44,12 +54,36 @@ function action(params) {
         }
 
         // Step 2: Find PR on test/{KEY} branch specifically
-        const pr = findTestPRForTicket(repoInfo.owner, repoInfo.repo, ticketKey);
-        if (!pr) {
+        const found = findTestPRForTicket(repoInfo.owner, repoInfo.repo, ticketKey);
+        if (!found) {
             const err = 'No test PR found for branch test/' + ticketKey;
             try { jira_post_comment({ key: ticketKey, comment: 'h3. ⚠️ Test PR Review Setup Failed\n\n' + err + '\n\n_Review cancelled._' }); } catch (e) {}
             return false;
         }
+
+        // If PR is already merged — move ticket to final status without re-reviewing
+        if (found.merged) {
+            const pr = found.pr;
+            try {
+                const ticket = jira_get_ticket({ key: ticketKey });
+                const currentStatus = ticket && ticket.fields && ticket.fields.status
+                    ? ticket.fields.status.name : '';
+                const finalStatus = currentStatus === 'In Review - Failed' ? 'Failed' : 'Passed';
+                jira_move_to_status({ key: ticketKey, statusName: finalStatus });
+                jira_post_comment({
+                    key: ticketKey,
+                    comment: 'h3. ✅ Test PR Already Merged\n\n' +
+                        'PR [#' + pr.number + '|' + pr.html_url + '] for branch {code}test/' + ticketKey + '{code} was already merged.\n\n' +
+                        'Skipping re-review — moved ticket to *' + finalStatus + '*.'
+                });
+                console.log('✅ PR already merged — moved', ticketKey, 'to', finalStatus);
+            } catch (e) {
+                console.warn('Failed to handle already-merged PR:', e);
+            }
+            return false;
+        }
+
+        const pr = found.pr;
 
         // Step 3: PR details
         const prDetails = gh.getPRDetails(repoInfo.owner, repoInfo.repo, pr.number);
