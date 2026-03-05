@@ -40,6 +40,18 @@ After RCA, check recent git history (`git log --oneline -20`) and the relevant c
 ```
 Then write a short summary to `outputs/response.md` and **stop — no code changes**.
 
+> ⚠️ **Before writing already_fixed.json — stop and think:**
+> This ticket was created (or re-opened) by a human or an automated system **after** that commit existed.
+> Ask yourself: *why would someone report a bug that is already fixed?*
+>
+> Likely answers:
+> - The fix is in the code but **not yet deployed** — the bug is still visible in production
+> - The fix addressed a **different root cause** — this is a new manifestation of the same symptom
+> - The "fix" was incomplete — it works in some cases but **not the one described in this ticket**
+> - The ticket was created from a **failed test run** that ran against the unfixed version
+>
+> Only write `already_fixed.json` if you are **certain** the exact scenario in this ticket is fully resolved AND the fix was deployed before the ticket was created. When in doubt — fix it.
+
 ### 3. Check if the bug can be fixed at all
 
 If fixing requires external credentials, human decisions, or infrastructure changes outside the codebase — or if there is evidence of multiple failed attempts — write `outputs/blocked.json`:
