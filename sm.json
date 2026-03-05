@@ -11,7 +11,8 @@
           "jql"         : "project = MYTUBE AND issuetype in ('Story') AND status in ('PO Review')",
           "configFile"  : "agents/story_ba_check.json",
           "skipIfLabel" : "sm_story_ba_check_triggered",
-          "addLabel"    : "sm_story_ba_check_triggered"
+          "addLabel"    : "sm_story_ba_check_triggered",
+          "localExecution" : true
         },
         {
           "description" : "BA Analysis Stories → generate Acceptance Criterias",
@@ -86,7 +87,8 @@
           "skipIfLabel" : "sm_bug_merged_triggered",
           "addLabel"    : "sm_bug_merged_triggered",
           "enabled"     : true,
-          "limit"       : 1
+          "limit"       : 1,
+          "localExecution" : true
         },
         {
           "description" : "Ready For Testing Bugs → generate test cases",
@@ -102,7 +104,8 @@
           "configFile"  : "agents/story_done_check.json",
           "skipIfLabel" : "sm_story_done_check_triggered",
           "addLabel"    : "sm_story_done_check_triggered",
-          "enabled"     : false
+          "enabled"     : false,
+          "localExecution" : true
         },
         {
           "description" : "In Testing Bugs → check all TCs passed → Done",
@@ -110,7 +113,8 @@
           "configFile"  : "agents/bug_done_check.json",
           "skipIfLabel" : "sm_bug_done_check_triggered",
           "addLabel"    : "sm_bug_done_check_triggered",
-          "enabled"     : false
+          "enabled"     : false,
+          "localExecution" : true
         },
         {
           "description" : "Backlog Test Cases → In Development + automate",
@@ -147,7 +151,8 @@
           "jql"         : "project = MYTUBE AND issuetype in ('Test Case') AND status in ('Bug To Fix')",
           "configFile"  : "agents/bug_to_fix_check.json",
           "skipIfLabel" : "sm_bug_to_fix_check_triggered",
-          "addLabel"    : "sm_bug_to_fix_check_triggered"
+          "addLabel"    : "sm_bug_to_fix_check_triggered",
+          "localExecution" : true
         },
         {
           "description" : "Failed Test Cases → check if all linked Bugs are In Testing → Re-run",
@@ -155,7 +160,8 @@
           "configFile"  : "agents/tc_rerun_trigger.json",
           "skipIfLabel" : "sm_tc_rerun_trigger_triggered",
           "addLabel"    : "sm_tc_rerun_trigger_triggered",
-          "enabled"     : false
+          "enabled"     : false,
+          "localExecution" : true
         },
         {
           "description" : "Re-run Test Cases → run existing test → Passed / Failed / In Review",
