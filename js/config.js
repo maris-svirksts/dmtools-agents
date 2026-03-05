@@ -57,7 +57,8 @@ const LABELS = {
     SD_UI: 'sd_ui',
     NEEDS_API_IMPLEMENTATION: 'needs_api_implementation',
     NEEDS_CORE_IMPLEMENTATION: 'needs_core_implementation',
-    AI_TEST_AUTOMATION: 'ai_test_automation'
+    AI_TEST_AUTOMATION: 'ai_test_automation',
+    PR_APPROVED: 'pr_approved'              // Added to PR and ticket when AI approves, removed after merge attempt
 };
 
 // Git Configuration

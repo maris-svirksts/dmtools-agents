@@ -448,8 +448,18 @@ function action(params) {
 
             // Step 5: Two-state outcome
             if (isApproved) {
-                // STATE 1: APPROVE → merge PR immediately
-                merged = mergePR(repoInfo.owner, repoInfo.repo, prNumber);
+                // STATE 1: APPROVE → label PR and Jira ticket; SM will retry merge when CI passes
+                try {
+                    github_add_pr_label({
+                        workspace: repoInfo.owner,
+                        repository: repoInfo.repo,
+                        pullRequestId: String(prNumber),
+                        label: LABELS.PR_APPROVED
+                    });
+                    console.log('✅ Added pr_approved label to GitHub PR #' + prNumber);
+                } catch (labelErr) {
+                    console.warn('Failed to add pr_approved label to GitHub PR:', labelErr);
+                }
             } else {
                 // STATE 2: REQUEST_CHANGES / BLOCK → do NOT merge
                 console.log('PR has issues (' + recommendation + ') - will NOT merge, returning ticket to In Development');
@@ -464,20 +474,13 @@ function action(params) {
 
         // Step 7: Update ticket status based on outcome
         try {
-            if (isApproved && merged) {
-                // Successfully merged → move to Merged
-                jira_move_to_status({
+            if (isApproved) {
+                // Approved → add pr_approved label to Jira and stay in In Review for SM retry-merge
+                jira_add_label({
                     key: ticketKey,
-                    statusName: STATUSES.MERGED
+                    label: LABELS.PR_APPROVED
                 });
-                console.log('✅ Ticket moved to Merged');
-            } else if (isApproved && !merged) {
-                // Approved but merge failed (conflict) → back to In Rework
-                jira_move_to_status({
-                    key: ticketKey,
-                    statusName: STATUSES.IN_REWORK
-                });
-                console.log('✅ Merge conflict — ticket moved to In Rework');
+                console.log('✅ Added pr_approved label to Jira ticket — SM will retry merge');
             } else {
                 // Has issues → move to In Rework for focused fixes
                 jira_move_to_status({
@@ -487,7 +490,7 @@ function action(params) {
                 console.log('✅ Ticket moved to In Rework');
             }
         } catch (statusError) {
-            console.warn('Could not move ticket status:', statusError);
+            console.warn('Could not update ticket status/label:', statusError);
         }
 
         // Step 8: Add review label

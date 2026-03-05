@@ -65,6 +65,14 @@
           "addLabel"    : "sm_story_review_triggered"
         },
         {
+          "description" : "In Review Stories & Bugs (pr_approved) → retry merge",
+          "jql"         : "project = MYTUBE AND issuetype in ('Story', 'Bug') AND status in ('In Review') AND labels = 'pr_approved'",
+          "configFile"  : "agents/retry_merge.json",
+          "skipIfLabel" : "sm_pr_merge_triggered",
+          "addLabel"    : "sm_pr_merge_triggered",
+          "localExecution" : true
+        },
+        {
           "description" : "In Rework Stories & Bugs → trigger pr_rework",
           "jql"         : "project = MYTUBE AND issuetype in ('Story', 'Bug') AND status in ('In Rework')",
           "configFile"  : "agents/pr_rework.json",
