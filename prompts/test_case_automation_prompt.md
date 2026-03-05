@@ -26,4 +26,27 @@ The feature code is **already implemented** in the `main` branch and **deployed*
 
 `response.md` and `pr_body.md` contain the same information but formatted differently — Jira MD vs GitHub MD.
 
+## ⚠️ CRITICAL: When the test FAILS — write a detailed bug report
+
+If the test fails, `outputs/bug_description.md` **must** contain enough detail for a developer to reproduce and fix the bug without running the test themselves. Generic descriptions like "the test failed" or "element not found" are NOT acceptable.
+
+**Required in `bug_description.md`:**
+
+1. **Exact steps to reproduce** — copy the test steps from `request.md` and annotate each one with what actually happened:
+   - Which step passed ✅
+   - Which step failed ❌ and with what error/behaviour
+   - What was on screen / in the response at the point of failure
+
+2. **Exact error message or assertion failure** — paste the full stack trace or assertion output from the test runner, not a summary.
+
+3. **Actual vs Expected** — be specific:
+   - ❌ Bad: "the page did not load"
+   - ✅ Good: "navigating to `/v/0097a85a-a616-4708-9dbd-8c2d81d47c38/` returned HTTP 404 and rendered the home page layout instead of the video watch page"
+
+4. **Environment details** — URL, browser, OS, any relevant config values used during the run.
+
+5. **Screenshots or logs** — if Playwright, attach screenshot path; paste relevant log lines.
+
+The same level of detail applies to `response.md` — the Jira comment must clearly state **which step failed and why**, not just "FAILED".
+
 Do NOT create branches or push. Do NOT modify any code outside `testing/`.
