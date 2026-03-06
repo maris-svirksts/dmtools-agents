@@ -29,36 +29,38 @@ function action(params) {
         if (!ticketKey) throw new Error('params.ticket.key is missing');
         console.log('=== TC linked bugs check for', ticketKey, '===');
 
-        // Find all linked Bugs for this TC
+        // Step 1: Find all linked Bugs for this TC
         const linkedBugs = jira_search_by_jql({
             jql: 'issue in linkedIssues("' + ticketKey + '") AND issuetype = Bug',
-            fields: ['status', 'summary'],
             maxResults: 50
         }) || [];
 
-        console.log('Linked Bugs:', linkedBugs.length);
+        const totalBugs = linkedBugs.length;
+        console.log('Linked Bugs:', totalBugs);
 
-        if (linkedBugs.length === 0) {
+        if (totalBugs === 0) {
             console.log('No linked Bugs found — releasing lock, will re-check next cycle');
             releaseLock();
             return { success: true, action: 'no_linked_bugs', ticketKey };
         }
 
-        // Check if all linked Bugs are in "In Testing"
-        const notInTesting = linkedBugs.filter(function(bug) {
-            return !bug.fields || !bug.fields.status || bug.fields.status.name !== STATUSES.IN_TESTING;
-        });
+        // Step 2: Find linked Bugs NOT in "In Testing" via JQL (more reliable than client-side field check)
+        const notInTestingBugs = jira_search_by_jql({
+            jql: 'issue in linkedIssues("' + ticketKey + '") AND issuetype = Bug AND status != "In Testing"',
+            maxResults: 1
+        }) || [];
 
-        console.log('Linked Bugs not yet In Testing:', notInTesting.length, '/', linkedBugs.length);
+        const notInTestingCount = notInTestingBugs.length;
+        console.log('Linked Bugs not yet In Testing:', notInTestingCount, '/', totalBugs);
 
-        if (notInTesting.length > 0) {
+        if (notInTestingCount > 0) {
             console.log('Not all linked Bugs are In Testing — releasing lock, will re-check next cycle');
             releaseLock();
-            return { success: true, action: 'waiting', total: linkedBugs.length, notInTesting: notInTesting.length, ticketKey };
+            return { success: true, action: 'waiting', total: totalBugs, notInTesting: notInTestingCount, ticketKey };
         }
 
         // All linked Bugs are In Testing → move TC to Re-run
-        console.log('All', linkedBugs.length, 'linked Bug(s) are In Testing — moving', ticketKey, 'to Re-run');
+        console.log('All', totalBugs, 'linked Bug(s) are In Testing — moving', ticketKey, 'to Re-run');
 
         jira_move_to_status({
             key: ticketKey,
@@ -81,12 +83,12 @@ function action(params) {
         jira_post_comment({
             key: ticketKey,
             comment: 'h3. 🔄 Test Case Queued for Re-run\n\n' +
-                'All *' + linkedBugs.length + '* linked Bug(s) are now in *In Testing* status.\n\n' +
+                'All *' + totalBugs + '* linked Bug(s) are now in *In Testing* status.\n\n' +
                 'This Test Case has been automatically moved to *Re-run* to verify the fix.'
         });
 
         console.log('✅ TC', ticketKey, 'moved to Re-run');
-        return { success: true, action: 'moved_to_rerun', totalBugs: linkedBugs.length, ticketKey };
+        return { success: true, action: 'moved_to_rerun', totalBugs: totalBugs, ticketKey };
 
     } catch (error) {
         console.error('❌ Error in checkTCLinkedBugsInTesting:', error);

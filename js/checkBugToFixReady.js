@@ -29,39 +29,38 @@ function action(params) {
         if (!ticketKey) throw new Error('params.ticket.key is missing');
         console.log('=== Bug To Fix ready check for', ticketKey, '===');
 
-        // Find all linked Bugs for this TC
+        // Step 1: Find all linked Bugs for this TC
         const linkedBugs = jira_search_by_jql({
             jql: 'issue in linkedIssues("' + ticketKey + '") AND issuetype = Bug',
-            fields: ['status', 'summary'],
             maxResults: 50
         }) || [];
 
-        console.log('Linked Bugs:', linkedBugs.length);
+        const totalBugs = linkedBugs.length;
+        console.log('Linked Bugs:', totalBugs);
 
-        if (linkedBugs.length === 0) {
+        if (totalBugs === 0) {
             console.log('No linked Bugs found — releasing lock, will re-check next cycle');
             releaseLock();
             return { success: true, action: 'no_linked_bugs', ticketKey };
         }
 
-        // Check if all linked Bugs are Done
-        const notDone = linkedBugs.filter(function(bug) {
-            return !bug.fields || !bug.fields.status || bug.fields.status.name !== STATUSES.DONE;
-        });
+        // Step 2: Find linked Bugs NOT yet Done via JQL (more reliable than client-side field check)
+        const notDoneBugs = jira_search_by_jql({
+            jql: 'issue in linkedIssues("' + ticketKey + '") AND issuetype = Bug AND status != "Done"',
+            maxResults: 1
+        }) || [];
 
-        console.log('Linked Bugs not yet Done:', notDone.length, '/', linkedBugs.length);
+        const notDoneCount = notDoneBugs.length;
+        console.log('Linked Bugs not yet Done:', notDoneCount, '/', totalBugs);
 
-        if (notDone.length > 0) {
-            notDone.forEach(function(bug) {
-                console.log('  Waiting on', bug.key, '— status:', bug.fields && bug.fields.status && bug.fields.status.name);
-            });
+        if (notDoneCount > 0) {
             console.log('Not all linked Bugs are Done — releasing lock, will re-check next cycle');
             releaseLock();
-            return { success: true, action: 'waiting', total: linkedBugs.length, notDone: notDone.length, ticketKey };
+            return { success: true, action: 'waiting', total: totalBugs, notDone: notDoneCount, ticketKey };
         }
 
         // All linked Bugs are Done → move TC back to Backlog
-        console.log('All', linkedBugs.length, 'linked Bug(s) are Done — moving', ticketKey, 'to Backlog');
+        console.log('All', totalBugs, 'linked Bug(s) are Done — moving', ticketKey, 'to Backlog');
 
         jira_move_to_status({
             key: ticketKey,
@@ -81,12 +80,12 @@ function action(params) {
         jira_post_comment({
             key: ticketKey,
             comment: 'h3. 🔄 Test Case Ready for Re-automation\n\n' +
-                'All *' + linkedBugs.length + '* linked Bug(s) are now in *Done* status.\n\n' +
+                'All *' + totalBugs + '* linked Bug(s) are now in *Done* status.\n\n' +
                 'This Test Case has been automatically moved back to *Backlog* to be re-automated against the fixed code.'
         });
 
         console.log('✅ TC', ticketKey, 'moved to Backlog');
-        return { success: true, action: 'moved_to_backlog', totalBugs: linkedBugs.length, ticketKey };
+        return { success: true, action: 'moved_to_backlog', totalBugs: totalBugs, ticketKey };
 
     } catch (error) {
         console.error('❌ Error in checkBugToFixReady:', error);

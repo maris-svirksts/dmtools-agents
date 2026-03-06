@@ -29,32 +29,36 @@ function action(params) {
         if (!ticketKey) throw new Error('params.ticket.key is missing');
         console.log('=== BA readiness check for', ticketKey, '===');
 
-        // Fetch subtasks via JQL — jira_search_by_jql returns a plain array
+        // Step 1: Fetch subtasks via JQL — jira_search_by_jql returns a plain array
         const subtasks = jira_search_by_jql({
             jql: 'parent = "' + ticketKey + '" AND issuetype = Subtask ORDER BY created ASC',
-            fields: ['status', 'summary']
+            maxResults: 100
         }) || [];
-        console.log('Total subtasks:', subtasks.length);
+        const totalSubtasks = subtasks.length;
+        console.log('Total subtasks:', totalSubtasks);
 
-        if (subtasks.length === 0) {
+        if (totalSubtasks === 0) {
             console.log('No subtasks found — releasing lock, will re-check next cycle');
             releaseLock();
             return { success: true, action: 'no_subtasks', ticketKey };
         }
 
-        const notDone = subtasks.filter(function(st) {
-            return !st.fields || !st.fields.status || st.fields.status.name !== 'Done';
-        });
-        console.log('Subtasks not yet Done:', notDone.length, '/', subtasks.length);
+        // Step 2: Find subtasks NOT yet Done via JQL (more reliable than client-side field check)
+        const notDoneSubtasks = jira_search_by_jql({
+            jql: 'parent = "' + ticketKey + '" AND issuetype = Subtask AND status != "Done"',
+            maxResults: 1
+        }) || [];
+        const notDoneCount = notDoneSubtasks.length;
+        console.log('Subtasks not yet Done:', notDoneCount, '/', totalSubtasks);
 
-        if (notDone.length > 0) {
+        if (notDoneCount > 0) {
             console.log('Not all subtasks done — releasing lock, will re-check next cycle');
             releaseLock();
-            return { success: true, action: 'waiting', total: subtasks.length, notDone: notDone.length, ticketKey };
+            return { success: true, action: 'waiting', total: totalSubtasks, notDone: notDoneCount, ticketKey };
         }
 
         // All subtasks Done → move to BA Analysis
-        console.log('All', subtasks.length, 'subtask(s) done — moving', ticketKey, 'to BA Analysis');
+        console.log('All', totalSubtasks, 'subtask(s) done — moving', ticketKey, 'to BA Analysis');
 
         jira_move_to_status({
             key: ticketKey,
@@ -64,12 +68,12 @@ function action(params) {
         jira_post_comment({
             key: ticketKey,
             comment: 'h3. ✅ PO Review Complete — Moving to BA Analysis\n\n' +
-                'All *' + subtasks.length + '* subtask(s) are *Done*.\n\n' +
+                'All *' + totalSubtasks + '* subtask(s) are *Done*.\n\n' +
                 'The story has been automatically moved to *BA Analysis*.'
         });
 
         console.log('✅ Story', ticketKey, 'moved to BA Analysis');
-        return { success: true, action: 'moved_to_ba_analysis', total: subtasks.length, ticketKey };
+        return { success: true, action: 'moved_to_ba_analysis', total: totalSubtasks, ticketKey };
 
     } catch (error) {
         console.error('❌ Error in checkSubtasksDoneForBA:', error);
