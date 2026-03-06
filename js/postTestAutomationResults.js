@@ -224,6 +224,15 @@ function action(params) {
                 const prTitle = ticketKey + ' ' + ticketSummary;
                 const prResult = createPullRequest(prTitle, branchName);
                 prUrl = prResult.prUrl;
+                if (!prResult.success || !prUrl) {
+                    // PR creation failed — branch has code but no PR; post comment and reset to Backlog for retry
+                    console.error('PR creation failed — resetting ticket to Backlog for retry');
+                    try {
+                        jira_post_comment({ key: ticketKey, comment: 'h3. ⚠️ PR Creation Failed\n\nTest code was pushed to branch {code}' + branchName + '{code} but the Pull Request could not be created.\n\nTicket moved back to *Backlog* — will be re-processed automatically. The next run will detect the existing branch and create the PR.\n\nError: ' + (prResult.error || 'unknown') });
+                        jira_move_to_status({ key: ticketKey, statusName: 'Backlog' });
+                    } catch (e) { console.warn('Could not reset to Backlog:', e); }
+                    return { success: false, error: 'PR creation failed: ' + (prResult.error || 'no URL returned') };
+                }
             } else if (gitResult.noNewCommit) {
                 noCodeChanges = true;
                 console.log('ℹ️ No test code changes — skipping PR review, moving ticket directly');
