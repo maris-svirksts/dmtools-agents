@@ -1,6 +1,7 @@
 Your task is intake analysis. Read all files in the 'input' folder:
-- The ticket description is in request.md — this is a raw idea or informal input
-- Read existing_epics.json to understand what Epics already exist in the project
+- `request.md` — this is a raw idea or informal input
+- `comments.md` *(if present)* — ticket comment history with additional context or decisions
+- `existing_epics.json` — understand what Epics already exist in the project
 - Read existing_stories.json to understand what Stories already exist — avoid creating duplicates
 - If you need full details of any existing story, run: dmtools jira_get_ticket <KEY> (use the real key from existing_epics.json or existing_stories.json)
 

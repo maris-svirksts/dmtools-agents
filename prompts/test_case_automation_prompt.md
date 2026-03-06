@@ -2,7 +2,8 @@ User request is in the 'input' folder. Read all files there.
 
 **IMPORTANT**: Before writing any test, read and follow these inputs in order:
 1. `request.md` — the Test Case ticket: objective, preconditions, steps, expected result, and priority.
-2. Any other files present in the input folder for additional context.
+2. `comments.md` *(if present)* — ticket comment history; recent comments may contain prior test run results, failure analysis, or reviewer feedback.
+3. Any other files present in the input folder for additional context.
 
 The feature code is **already implemented** in the `main` branch and **deployed**. Your job is to automate this test case — not to implement features.
 

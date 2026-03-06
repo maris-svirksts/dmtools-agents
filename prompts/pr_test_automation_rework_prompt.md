@@ -1,8 +1,10 @@
 User request is in the 'input' folder. Read all files there.
 
 **IMPORTANT**: Read in order:
-1. `ticket.md` — the Test Case ticket (objective, steps, expected result)
-2. `pr_info.md` — PR metadata
+1. `request.md` *(if present)* — full ticket details
+2. `comments.md` *(if present)* — ticket comment history; recent comments contain previous test run results and review feedback
+3. `ticket.md` — the Test Case ticket (objective, steps, expected result)
+4. `pr_info.md` — PR metadata
 3. `pr_diff.txt` — current test code
 4. `merge_conflicts.md` *(if present)* — **Resolve all merge conflicts FIRST** before touching anything else
 5. `pr_discussions.md` — review comments that must be addressed

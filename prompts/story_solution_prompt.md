@@ -1,4 +1,9 @@
-User request is in 'input' folder, read all files there and do what is requested. Follow instructions from input. request.md contains the story details.
+User request is in 'input' folder, read all files there and do what is requested. Follow instructions from input.
+
+Always read these files first if present:
+- `request.md` — full story details
+- `comments.md` — ticket comment history with context and prior decisions
+
 **IMPORTANT** don't start solution from: Solution Design: ... - start from content. 
 **CRITICAL** check existing codebase. Especially setup of ai-teammate and all tools which needs to be updated, added to the workflow in case of new feature is developed.
 **IMPORTANT** Write the solution design to outputs/response.md and the Mermaid diagram to outputs/diagram.md.

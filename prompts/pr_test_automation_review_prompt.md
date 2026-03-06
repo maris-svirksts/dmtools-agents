@@ -1,8 +1,10 @@
 User request is in the 'input' folder. Read all files there.
 
 **IMPORTANT**: Read in order:
-1. `ticket.md` — the Test Case ticket (objective, steps, expected result)
-2. `pr_info.md` — PR metadata and current test result (PASSED or FAILED)
+1. `request.md` *(if present)* — full ticket details
+2. `comments.md` *(if present)* — ticket comment history; recent comments contain previous test run results
+3. `ticket.md` — the Test Case ticket (objective, steps, expected result)
+4. `pr_info.md` — PR metadata and current test result (PASSED or FAILED)
 3. `pr_diff.txt` — all code changes in this PR
 4. `pr_discussions.md` — previous review comments (if any)
 5. `pr_discussions_raw.json` *(if present)* — previous thread IDs; populate `resolvedThreadIds` in `pr_review.json` with `threadId` values for any prior thread that is **fully fixed** in this diff
