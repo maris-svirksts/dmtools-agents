@@ -139,15 +139,16 @@ function action(params) {
 
         } else {
             // action: none — test code issue, not an app bug
-            // Keep TC in Failed + keep trigger label to prevent endless re-triggering
             comment = 'h3. ℹ️ No Bug Created\n\n' +
                 (decision.reason || 'AI determined no bug creation or linking is required.') +
                 '\n\n_TC remains in Failed status for manual review._';
 
             try { jira_post_comment({ key: ticketKey, comment: comment }); } catch (e) {}
             try { jira_remove_label({ key: ticketKey, label: wipLabel }); } catch (e) {}
-            // Keep smTriggerLabel — prevents the SM rule from re-firing on the same TC
-            console.log('ℹ️ No action taken for', ticketKey, '— TC stays in Failed, trigger label kept');
+            if (smTriggerLabel) {
+                try { jira_remove_label({ key: ticketKey, label: smTriggerLabel }); } catch (e) {}
+            }
+            console.log('ℹ️ No action taken for', ticketKey, '— TC stays in Failed');
             return { success: true, ticketKey: ticketKey, bugKey: null, action: 'none' };
         }
 
@@ -208,6 +209,12 @@ function action(params) {
                 comment: 'h3. ❌ Bug Creation Error\n\n{code}' + error.toString() + '{code}'
             });
         } catch (e) {}
+        // Release SM trigger label so SM can retry next cycle
+        var customParamsOnErr = params.jobParams && params.jobParams.customParams;
+        var smLabelOnErr = customParamsOnErr && customParamsOnErr.removeLabel;
+        if (smLabelOnErr) {
+            try { jira_remove_label({ key: params.ticket.key, label: smLabelOnErr }); } catch (e) {}
+        }
         return { success: false, error: error.toString() };
     }
 }
