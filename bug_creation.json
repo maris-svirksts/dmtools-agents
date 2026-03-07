@@ -14,7 +14,7 @@
         "If action is 'create', also write outputs/bug_description.md in Jira Markdown format."
       ],
       "knownInfo" : "",
-      "formattingRules" : "outputs/bug_decision.json must be valid JSON. 'action' must be one of: 'link', 'create', 'none'."
+      "formattingRules" : "outputs/bug_decision.json must be valid JSON. 'action' must be one of: 'link', 'create', 'none', 'tests_pass'."
     },
     "cliPrompt" : "./agents/prompts/bug_creation_prompt.md",
     "cliCommands" : [
