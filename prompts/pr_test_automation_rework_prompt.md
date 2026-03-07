@@ -21,6 +21,11 @@ The feature code is **already in main branch**. Your job is to:
 
 ## Output files
 
+**⚠️ CRITICAL: All output files MUST be written to `outputs/` at the repository root** (e.g. `/home/runner/work/repo/repo/outputs/`).
+Do NOT write them inside `input/`, `input/TICKET-KEY/`, or any subfolder of `input/`. The post-processing script reads from `outputs/` at the repo root — writing elsewhere means all results will be silently lost.
+
+Run `mkdir -p outputs` first to ensure the directory exists.
+
 - `outputs/response.md` — rework summary in **Jira Markdown** (short, factual): what was fixed + new test result
 - `outputs/pr_body.md` — same in **GitHub Markdown** (always required — updates PR description)
 - `outputs/test_automation_result.json` — new test result (see instructions for format)

@@ -23,6 +23,11 @@ Your mission is to address every issue raised in `pr_discussions.md`. For each r
 
 After fixing all issues, compile and run all tests to confirm they pass. If tests fail, fix them before finishing.
 
+**⚠️ CRITICAL: All output files MUST be written to `outputs/` at the repository root** (e.g. `/home/runner/work/repo/repo/outputs/`).
+Do NOT write them inside `input/`, `input/TICKET-KEY/`, or any subfolder of `input/`. The post-processing script reads from `outputs/` at the repo root — writing elsewhere means all results will be silently lost.
+
+Run `mkdir -p outputs` first to ensure the directory exists.
+
 Write two output files:
 
 **`outputs/response.md`** — general fix summary (will be posted as a PR comment):

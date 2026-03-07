@@ -20,6 +20,11 @@ The feature code is **already implemented** in the `main` branch and **deployed*
 
 ## Output files
 
+**⚠️ CRITICAL: All output files MUST be written to `outputs/` at the repository root** (e.g. `/home/runner/work/repo/repo/outputs/`).
+Do NOT write them inside `input/`, `input/TICKET-KEY/`, or any subfolder of `input/`. The post-processing script reads from `outputs/` at the repo root — writing elsewhere means all results will be silently lost.
+
+Run `mkdir -p outputs` first to ensure the directory exists.
+
 - `outputs/response.md` — test result summary in **Jira Markdown** (posted as Jira ticket comment)
 - `outputs/pr_body.md` — test result summary in **GitHub Markdown** (used as PR description)
 - `outputs/test_automation_result.json` — structured result JSON (see instructions for exact format)
