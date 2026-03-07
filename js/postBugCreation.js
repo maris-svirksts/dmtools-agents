@@ -137,6 +137,25 @@ function action(params) {
                 comment = 'h3. ❌ Bug Creation Failed\n\n{code}' + e.toString() + '{code}';
             }
 
+        } else if (decision.action === 'tests_pass') {
+            // Tests are currently passing — ticket status is stale, move to Passed
+            comment = 'h3. ✅ Tests Passing — Moving to Passed\n\n' +
+                (decision.reason || 'All tests passed in the most recent run — the underlying issue has been fixed.') +
+                '\n\n_Ticket status was stale. TC automatically moved to *Passed*._';
+
+            try { jira_post_comment({ key: ticketKey, comment: comment }); } catch (e) {}
+            try {
+                jira_move_to_status({ key: ticketKey, statusName: STATUSES.PASSED });
+                console.log('✅ Tests pass — moved', ticketKey, 'to', STATUSES.PASSED);
+            } catch (e) {
+                console.warn('Failed to move to Passed:', e);
+            }
+            try { jira_remove_label({ key: ticketKey, label: wipLabel }); } catch (e) {}
+            if (smTriggerLabel) {
+                try { jira_remove_label({ key: ticketKey, label: smTriggerLabel }); } catch (e) {}
+            }
+            return { success: true, ticketKey: ticketKey, bugKey: null, action: 'tests_pass' };
+
         } else {
             // action: none — test code issue, not an app bug
             comment = 'h3. ℹ️ No Bug Created\n\n' +

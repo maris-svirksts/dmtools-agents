@@ -26,7 +26,9 @@ If `input/no_open_bugs.md` exists — there are no open bugs, skip to Step 3 dir
 
 **Case B — No match found**: Create a new bug ticket that describes the root cause of the test failure.
 
-**Case C — No action needed**: If the Test Case failed due to a test code issue (not an application bug), state so.
+**Case C — Tests are currently passing**: Check `comments.md` carefully. If the **most recent test run** shows all tests **PASSED** (regardless of the ticket's current Failed status), use this case. The ticket status is stale — it failed in a previous run but the underlying issue has since been fixed. Do NOT create a bug.
+
+**Case D — No action needed**: If the Test Case failed due to a test code issue (not an application bug), and tests are **not** currently passing, state so.
 
 ## Output
 
@@ -51,7 +53,15 @@ Write `outputs/bug_decision.json` with exactly one of these formats:
 }
 ```
 
-**No action:**
+**Tests currently passing (stale Failed status):**
+```json
+{
+  "action": "tests_pass",
+  "reason": "All tests passed in the most recent run — the underlying issue has been fixed"
+}
+```
+
+**No action (test code issue):**
 ```json
 {
   "action": "none",
