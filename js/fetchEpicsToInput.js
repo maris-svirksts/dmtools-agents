@@ -10,6 +10,18 @@
  * @param {Object} params - Parameters from DMTools
  * @param {string} params.inputFolderPath - Path to the input folder for this run
  */
+/**
+ * Find a field value by partial key name (handles "Display Name (customfieldXXX)" keys).
+ */
+function findField(fields, nameSubstring) {
+    for (var key in fields) {
+        if (key.indexOf(nameSubstring) !== -1) {
+            return fields[key];
+        }
+    }
+    return null;
+}
+
 function action(params) {
     try {
         const folder = params.inputFolderPath;
@@ -20,7 +32,7 @@ function action(params) {
         try {
             var rawEpics = jira_search_by_jql({
                 jql: 'project = ' + project + ' AND issuetype = Epic ORDER BY created DESC',
-                fields: ['key', 'summary', 'description', 'priority', 'diagrams', 'parent']
+                fields: ['key', 'summary', 'description', 'priority', 'parent']
             });
             var epics = [];
             for (var i = 0; i < rawEpics.length; i++) {
@@ -31,7 +43,7 @@ function action(params) {
                     summary: f.summary || '',
                     description: f.description || '',
                     priority: f.priority ? f.priority.name : '',
-                    diagrams: f.diagrams || null,
+                    diagrams: findField(f, 'Diagrams') || findField(f, 'diagrams') || null,
                     parent: f.parent ? f.parent.key : null
                 });
             }
@@ -45,8 +57,7 @@ function action(params) {
 
         try {
             var rawStories = jira_search_by_jql({
-                jql: 'project = ' + project + ' AND issuetype = Story ORDER BY created DESC',
-                fields: ['key', 'summary', 'description', 'status', 'priority', 'diagrams', 'parent', 'Acceptance Criterias', 'Solution', 'Diagrams']
+                jql: 'project = ' + project + ' AND issuetype = Story ORDER BY created DESC'
             });
             var stories = [];
             for (var j = 0; j < rawStories.length; j++) {
@@ -58,9 +69,9 @@ function action(params) {
                     description: sf.description || '',
                     status: sf.status ? sf.status.name : '',
                     priority: sf.priority ? sf.priority.name : '',
-                    diagrams: sf['Diagrams'] || sf.diagrams || null,
-                    acceptanceCriterias: sf['Acceptance Criterias'] || null,
-                    solution: sf['Solution'] || null,
+                    diagrams: findField(sf, 'Diagrams') || findField(sf, 'diagrams') || null,
+                    acceptanceCriterias: findField(sf, 'Acceptance Criterias') || null,
+                    solution: findField(sf, 'Solution') || null,
                     parent: sf.parent ? sf.parent.key : null
                 });
             }
