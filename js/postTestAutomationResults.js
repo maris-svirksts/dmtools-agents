@@ -379,6 +379,13 @@ function action(params) {
                 comment: 'h3. ❌ Test Automation Error\n\n{code}' + error.toString() + '{code}'
             });
         } catch (e) {}
+        try {
+            const smTriggerLabel = params.jobParams && params.jobParams.customParams && params.jobParams.customParams.removeLabel;
+            if (smTriggerLabel) {
+                jira_remove_label({ key: params.ticket.key, label: smTriggerLabel });
+                console.log('✅ Removed SM trigger label on error:', smTriggerLabel);
+            }
+        } catch (e) {}
         return { success: false, error: error.toString() };
     }
 }
