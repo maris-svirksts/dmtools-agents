@@ -231,6 +231,13 @@ function action(params) {
                         jira_post_comment({ key: ticketKey, comment: 'h3. ⚠️ PR Creation Failed\n\nTest code was pushed to branch {code}' + branchName + '{code} but the Pull Request could not be created.\n\nTicket moved back to *Backlog* — will be re-processed automatically. The next run will detect the existing branch and create the PR.\n\nError: ' + (prResult.error || 'unknown') });
                         jira_move_to_status({ key: ticketKey, statusName: 'Backlog' });
                     } catch (e) { console.warn('Could not reset to Backlog:', e); }
+                    try {
+                        const smTriggerLabel = params.jobParams && params.jobParams.customParams && params.jobParams.customParams.removeLabel;
+                        if (smTriggerLabel) {
+                            jira_remove_label({ key: ticketKey, label: smTriggerLabel });
+                            console.log('✅ Removed SM trigger label on PR failure:', smTriggerLabel);
+                        }
+                    } catch (e) { console.warn('Could not remove SM trigger label:', e); }
                     return { success: false, error: 'PR creation failed: ' + (prResult.error || 'no URL returned') };
                 }
             } else if (gitResult.noNewCommit) {
