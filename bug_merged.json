@@ -1,24 +1,26 @@
 {
-  "name" : "Teammate",
-  "params" : {
-    "metadata" : {
-      "contextId" : "bug_merged"
+  "name": "Teammate",
+  "params": {
+    "metadata": {
+      "contextId": "bug_merged"
     },
-    "agentParams" : {
-      "aiRole" : "Bug tracking assistant",
-      "instructions" : [],
-      "knownInfo" : "",
-      "formattingRules" : "",
-      "fewShots" : ""
+    "agentParams": {
+      "aiRole": "Bug tracking assistant",
+      "instructions": [
+        "./agents/instructions/common/bash_tools.md"
+      ],
+      "knownInfo": "",
+      "formattingRules": "",
+      "fewShots": ""
     },
-    "outputType" : "none",
-    "ticketContextDepth" : 1,
-    "skipAIProcessing" : true,
-    "alwaysPostComments" : true,
-    "postJSAction" : "agents/js/notifyBugMerged.js",
-    "customParams" : {
-      "removeLabel" : "sm_bug_merged_triggered"
+    "outputType": "none",
+    "ticketContextDepth": 1,
+    "skipAIProcessing": true,
+    "alwaysPostComments": true,
+    "postJSAction": "agents/js/notifyBugMerged.js",
+    "customParams": {
+      "removeLabel": "sm_bug_merged_triggered"
     },
-    "inputJql" : "key = MYTUBE-74"
+    "inputJql": "key = MYTUBE-74"
   }
 }
