@@ -58,9 +58,9 @@ function performGitOperations(branchName, commitMessage) {
             console.warn('Could not list testing/tests/:', e);
         }
 
-        // Stage testing/ and outputs/ folders
-        console.log('Staging testing/ and outputs/ folders...');
-        cli_execute_command({ command: 'git add testing/ outputs/' });
+        // Stage testing/ folder only (outputs/ is gitignored — test artifacts should not be committed)
+        console.log('Staging testing/ folder...');
+        cli_execute_command({ command: 'git add testing/' });
 
         var rawStatus = cli_execute_command({ command: 'git status --porcelain' }) || '';
         console.log('Raw git status length:', rawStatus.length);
@@ -244,7 +244,16 @@ function action(params) {
                 noCodeChanges = true;
                 console.log('ℹ️ No test code changes — skipping PR review, moving ticket directly');
             } else {
+                // Git operations failed — reset to Backlog for retry
                 console.warn('Git operations failed:', gitResult.error);
+                try {
+                    jira_post_comment({ key: ticketKey, comment: 'h3. ⚠️ Git Operations Failed\n\nFailed to commit/push test code: ' + gitResult.error + '\n\nTicket moved back to *Backlog* — will be re-processed automatically.' });
+                    jira_move_to_status({ key: ticketKey, statusName: STATUSES.BACKLOG });
+                } catch (e) { console.warn('Could not reset to Backlog:', e); }
+                try {
+                    jira_remove_label({ key: ticketKey, label: 'sm_test_automation_triggered' });
+                } catch (e) {}
+                return { success: false, error: 'Git operations failed: ' + gitResult.error };
             }
         }
 
