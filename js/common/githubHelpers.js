@@ -114,38 +114,73 @@ function getPRDiff(baseBranch, headBranch) {
     try {
         console.log('Generating diff between', baseBranch, 'and', headBranch);
 
+        // Compute the merge-base to use as diff base (consistent across all strategies)
+        const originBase = baseBranch.indexOf('origin/') === 0 ? baseBranch : 'origin/' + baseBranch;
+        let mergeBase = '';
+        try {
+            mergeBase = cleanCommandOutput(
+                cli_execute_command({ command: 'git merge-base ' + originBase + ' ' + headBranch }) || ''
+            ).trim();
+        } catch (e) {
+            console.warn('Could not compute merge-base:', e.message || e);
+        }
+
+        // Determine which files were actually touched by non-merge commits on this branch.
+        // This prevents files brought in via "Merge branch 'main'" from polluting the diff
+        // and being flagged as out-of-scope by the reviewer.
+        let featureFiles = [];
+        if (mergeBase) {
+            try {
+                const logOutput = cleanCommandOutput(
+                    cli_execute_command({
+                        command: 'git log --no-merges --name-only --format="" ' + mergeBase + '..' + headBranch
+                    }) || ''
+                );
+                featureFiles = logOutput.split('\n')
+                    .map(function(f) { return f.trim(); })
+                    .filter(function(f) { return f.length > 0; })
+                    .filter(function(f, i, arr) { return arr.indexOf(f) === i; }); // dedupe
+                console.log('Non-merge commit files (' + featureFiles.length + '):', featureFiles.slice(0, 10).join(', ') + (featureFiles.length > 10 ? '...' : ''));
+            } catch (e) {
+                console.warn('Could not list non-merge commit files:', e.message || e);
+            }
+        }
+
+        // Build the scoped diff command — limit to feature-only files when available
+        const fileSuffix = featureFiles.length > 0
+            ? ' -- ' + featureFiles.map(function(f) { return '"' + f + '"'; }).join(' ')
+            : '';
+
         // First try three-dot diff (shows only changes on headBranch since divergence)
         try {
-            const diff = cli_execute_command({ command: 'git diff ' + baseBranch + '...' + headBranch }) || '';
-            console.log('Diff size:', diff.length, 'chars');
+            const cmd = 'git diff ' + baseBranch + '...' + headBranch + fileSuffix;
+            const diff = cli_execute_command({ command: cmd }) || '';
+            console.log('Diff size:', diff.length, 'chars', fileSuffix ? '(scoped to ' + featureFiles.length + ' files)' : '');
             return cleanCommandOutput(diff);
         } catch (e1) {
-            console.warn('Three-dot diff failed (likely no merge base), trying with origin/ prefix:', e1.message || e1);
+            console.warn('Three-dot diff failed, trying with origin/ prefix:', e1.message || e1);
         }
 
         // Fallback: try with explicit origin/ prefix on base branch
         try {
-            const originBase = baseBranch.indexOf('origin/') === 0 ? baseBranch : 'origin/' + baseBranch;
-            const diff = cli_execute_command({ command: 'git diff ' + originBase + '...' + headBranch }) || '';
+            const cmd = 'git diff ' + originBase + '...' + headBranch + fileSuffix;
+            const diff = cli_execute_command({ command: cmd }) || '';
             console.log('Diff size (origin fallback):', diff.length, 'chars');
             return cleanCommandOutput(diff);
         } catch (e2) {
             console.warn('Origin-prefix diff also failed, trying merge-base approach:', e2.message || e2);
         }
 
-        // Last resort: find explicit merge-base commit and diff from there
-        try {
-            const originBase = baseBranch.indexOf('origin/') === 0 ? baseBranch : 'origin/' + baseBranch;
-            const mergeBase = cleanCommandOutput(
-                cli_execute_command({ command: 'git merge-base ' + originBase + ' ' + headBranch }) || ''
-            );
-            if (mergeBase && mergeBase.trim().length > 0) {
-                const diff = cli_execute_command({ command: 'git diff ' + mergeBase.trim() + '...' + headBranch }) || '';
+        // Last resort: diff from explicit merge-base
+        if (mergeBase) {
+            try {
+                const cmd = 'git diff ' + mergeBase + '..' + headBranch + fileSuffix;
+                const diff = cli_execute_command({ command: cmd }) || '';
                 console.log('Diff size (merge-base fallback):', diff.length, 'chars');
                 return cleanCommandOutput(diff);
+            } catch (e3) {
+                console.warn('Merge-base diff also failed:', e3.message || e3);
             }
-        } catch (e3) {
-            console.warn('Merge-base diff also failed:', e3.message || e3);
         }
 
         console.error('All diff strategies failed for', baseBranch, '...', headBranch);
@@ -229,6 +264,7 @@ function fetchDiscussionsAndRawData(workspace, repository, pullRequestId) {
                 const rootCommentId = rootComment.id || rootComment.databaseId || null;
                 // Match by root-comment databaseId — robust against ordering differences
                 const graphqlThreadId = rootCommentId ? (reviewThreadByCommentId[rootCommentId] || null) : null;
+                const isResolved = thread.resolved === true || thread.isResolved === true;
 
                 // Only inline review comments (with a file path) can be replied to via
                 // github_reply_to_pr_thread. PR-level review comments without a path
@@ -239,9 +275,13 @@ function fetchDiscussionsAndRawData(workspace, repository, pullRequestId) {
                     threadId: graphqlThreadId,      // GraphQL node ID → github_resolve_pr_thread.threadId
                     path: thread.path || null,
                     line: thread.line || thread.original_line || null,
-                    resolved: thread.resolved === true || thread.isResolved === true,
+                    resolved: isResolved,
                     body: (rootComment.body || '').trim()
                 });
+
+                // Resolved threads are excluded from pr_discussions.md so the reviewer
+                // cannot accidentally re-raise already-fixed issues.
+                if (isResolved) return;
 
                 section += '### Thread ' + (idx + 1);
                 if (thread.path) {
@@ -269,14 +309,19 @@ function fetchDiscussionsAndRawData(workspace, repository, pullRequestId) {
                     section += '> **' + rAuthor + '** (' + rDate + '): ' + (reply.body || '').trim() + '\n\n';
                 });
 
-                if (thread.resolved === true || thread.isResolved === true) {
-                    section += '_✅ Thread resolved_\n\n';
-                }
                 section += '---\n\n';
             });
 
+            const resolvedCount = rawThreads.filter(function(t) { return t.resolved; }).length;
+            const openCount = conversations.length - resolvedCount;
+
+            // Prepend summary so reviewer knows how many threads were already resolved
+            if (resolvedCount > 0) {
+                section = '> ℹ️ **' + resolvedCount + ' thread(s) already resolved and excluded from this review.**\n\n' + section;
+            }
+
             sections.push(section);
-            console.log('Discussions: ' + conversations.length + ' threads,',
+            console.log('Discussions: ' + conversations.length + ' threads (' + openCount + ' open, ' + resolvedCount + ' resolved),',
                 rawThreads.filter(function(t) { return t.rootCommentId; }).length + ' reply IDs,',
                 rawThreads.filter(function(t) { return t.threadId; }).length + ' resolve IDs');
         }
