@@ -32,23 +32,23 @@ function action(params) {
         if (!ticketKey) throw new Error('params.ticket.key is missing');
         console.log('=== Task done check for', ticketKey, '===');
 
-        // Step 1: Count all child Stories
+        // Step 1: Count all linked Stories
         const allStories = jira_search_by_jql({
-            jql: 'parent = "' + ticketKey + '" AND issuetype in (Story)',
+            jql: 'issue in linkedIssues("' + ticketKey + '") AND issuetype in (Story)',
             maxResults: 100
         }) || [];
         const totalStories = allStories.length;
-        console.log('Child Stories:', totalStories);
+        console.log('Linked Stories:', totalStories);
 
         if (totalStories === 0) {
-            console.log('No child Stories found — releasing lock, will re-check next cycle');
+            console.log('No linked Stories found — releasing lock, will re-check next cycle');
             releaseLock();
             return { success: true, action: 'no_stories', ticketKey };
         }
 
-        // Step 2: Find child Stories NOT yet Done
+        // Step 2: Find linked Stories NOT yet Done
         const notDoneStories = jira_search_by_jql({
-            jql: 'parent = "' + ticketKey + '" AND issuetype in (Story) AND status != "Done"',
+            jql: 'issue in linkedIssues("' + ticketKey + '") AND issuetype in (Story) AND status != "Done"',
             maxResults: 1
         }) || [];
         const notDoneCount = notDoneStories.length;
