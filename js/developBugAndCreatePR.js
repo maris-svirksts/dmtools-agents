@@ -19,6 +19,7 @@
  *                               → Delegate to developTicketAndCreatePR: commit, push, create PR, move to In Review
  */
 
+var configLoader = require('./configLoader.js');
 const { STATUSES, LABELS } = require('./config.js');
 const developTicket = require('./developTicketAndCreatePR.js');
 
@@ -52,6 +53,7 @@ function action(params) {
     try {
         const actualParams = params.ticket ? params : (params.jobParams || params);
         const ticketKey = actualParams.ticket.key;
+        var config = configLoader.loadProjectConfig(params.jobParams || params);
 
         console.log('=== Bug development post-action for', ticketKey, '===');
 
@@ -197,9 +199,9 @@ function action(params) {
                                l.indexOf('Script done') === -1;
                     }).join('').trim();
                     if (partialBranch) {
-                        cli_execute_command({ command: 'git config user.name "AI Teammate"' });
-                        cli_execute_command({ command: 'git config user.email "ai-teammate@users.noreply.github.com"' });
-                        cli_execute_command({ command: 'git commit -m "' + ticketKeyForCheck + ' WIP: partial analysis (agent interrupted)"' });
+                        cli_execute_command({ command: 'git config user.name "' + config.git.authorName + '"' });
+                        cli_execute_command({ command: 'git config user.email "' + config.git.authorEmail + '"' });
+                        cli_execute_command({ command: 'git commit -m "' + configLoader.formatTemplate(config.formats.commitMessage.wip, {ticketKey: ticketKeyForCheck}) + '"' });
                         cli_execute_command({ command: 'git push -u origin ' + partialBranch });
                         console.log('✅ Pushed partial analysis to branch:', partialBranch);
                     }

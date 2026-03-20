@@ -7,6 +7,7 @@
  * 5. Posts "Rework Started" comment to Jira
  */
 
+var configLoader = require('./configLoader.js');
 const gh = require('./common/githubHelpers.js');
 const fetchQuestionsToInput = require('./fetchQuestionsToInput.js');
 
@@ -15,6 +16,7 @@ function action(params) {
         var actualParams = params.inputFolderPath ? params : (params.jobParams || params);
         var inputFolder = actualParams.inputFolderPath;
         var ticketKey = inputFolder.split('/').pop();
+        var config = configLoader.loadProjectConfig(params.jobParams || params);
 
         console.log('=== Rework setup for:', ticketKey, '===');
 
@@ -52,7 +54,7 @@ function action(params) {
         }
 
         // Step 5: Diff + discussions (human-readable + raw with IDs)
-        const baseBranch = prDetails.base ? prDetails.base.ref : 'main';
+        const baseBranch = prDetails.base ? prDetails.base.ref : config.git.baseBranch;
 
         // Step 4.5: Merge base branch and detect conflicts
         // Always merges origin/{baseBranch} so the branch stays up to date.

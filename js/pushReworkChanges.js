@@ -7,6 +7,7 @@
  * 4. Posts completion comment to Jira
  */
 
+var configLoader = require('./configLoader.js');
 const { GIT_CONFIG, STATUSES } = require('./config.js');
 
 function cleanCommandOutput(output) {
@@ -63,10 +64,10 @@ function findPRForTicket(workspace, repository, ticketKey) {
     }
 }
 
-function configureGitAuthor() {
+function configureGitAuthor(config) {
     try {
-        cli_execute_command({ command: 'git config user.name "' + GIT_CONFIG.AUTHOR_NAME + '"' });
-        cli_execute_command({ command: 'git config user.email "' + GIT_CONFIG.AUTHOR_EMAIL + '"' });
+        cli_execute_command({ command: 'git config user.name "' + config.git.authorName + '"' });
+        cli_execute_command({ command: 'git config user.email "' + config.git.authorEmail + '"' });
         return true;
     } catch (error) {
         console.error('Failed to configure git author:', error);
@@ -74,7 +75,7 @@ function configureGitAuthor() {
     }
 }
 
-function commitAndPush(ticketKey) {
+function commitAndPush(ticketKey, config) {
     const rawBranch = cli_execute_command({ command: 'git branch --show-current' }) || '';
     const branchName = cleanCommandOutput(rawBranch);
 
@@ -91,7 +92,7 @@ function commitAndPush(ticketKey) {
     const status = cleanCommandOutput(rawStatus);
 
     if (status.trim()) {
-        const commitMsg = ticketKey + ' Rework: address PR review comments';
+        const commitMsg = configLoader.formatTemplate(config.formats.commitMessage.rework, {ticketKey: ticketKey});
         cli_execute_command({ command: 'git commit -m "' + commitMsg + '"' });
         console.log('✅ Committed rework changes');
     } else {
@@ -230,16 +231,17 @@ function action(params) {
         const actualParams = params.ticket ? params : (params.jobParams || params);
         const ticketKey = actualParams.ticket.key;
         const fixSummary = actualParams.response || '_(No fix summary generated)_';
+        var config = configLoader.loadProjectConfig(params.jobParams || params);
 
         console.log('=== Push rework changes for:', ticketKey, '===');
 
         // Configure git
-        configureGitAuthor();
+        configureGitAuthor(config);
 
         // Commit and push
         let branchName;
         try {
-            branchName = commitAndPush(ticketKey);
+            branchName = commitAndPush(ticketKey, config);
         } catch (gitError) {
             console.error('Git operations failed:', gitError);
             try {

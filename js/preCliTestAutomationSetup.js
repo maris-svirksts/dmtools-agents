@@ -4,6 +4,7 @@
  * 2. Creates/checks out test/{TICKET-KEY} branch from main
  */
 
+var configLoader = require('./configLoader.js');
 const { GIT_CONFIG, STATUSES } = require('./config.js');
 const fetchLinkedBugsToInput = require('./fetchLinkedBugsToInput.js');
 
@@ -17,13 +18,13 @@ function cleanCommandOutput(output) {
     }).join('\n').trim();
 }
 
-function checkoutBranch(ticketKey) {
-    var branchName = 'test/' + ticketKey;
+function checkoutBranch(ticketKey, config) {
+    var branchName = configLoader.formatBranchName(config.git.branchPrefix.test, ticketKey);
     console.log('Setting up branch:', branchName);
 
     try {
-        cli_execute_command({ command: 'git config user.name "' + GIT_CONFIG.AUTHOR_NAME + '"' });
-        cli_execute_command({ command: 'git config user.email "' + GIT_CONFIG.AUTHOR_EMAIL + '"' });
+        cli_execute_command({ command: 'git config user.name "' + config.git.authorName + '"' });
+        cli_execute_command({ command: 'git config user.email "' + config.git.authorEmail + '"' });
     } catch (e) {
         console.warn('Failed to configure git author:', e);
     }
@@ -49,7 +50,7 @@ function checkoutBranch(ticketKey) {
      *       diverges the local branch from its remote counterpart and breaks commits.
      */
     function syncWithMain() {
-        var base = 'origin/' + GIT_CONFIG.DEFAULT_BASE_BRANCH;
+        var base = 'origin/' + config.git.baseBranch;
         try {
             cli_execute_command({ command: 'git rebase ' + base });
             console.log('✅ Rebase succeeded');
@@ -89,9 +90,9 @@ function checkoutBranch(ticketKey) {
             cli_execute_command({ command: 'git checkout -b ' + branchName + ' origin/' + branchName });
             syncWithMain();
         } else {
-            console.log('Creating new branch from', GIT_CONFIG.DEFAULT_BASE_BRANCH + ':', branchName);
-            cli_execute_command({ command: 'git checkout ' + GIT_CONFIG.DEFAULT_BASE_BRANCH });
-            cli_execute_command({ command: 'git pull origin ' + GIT_CONFIG.DEFAULT_BASE_BRANCH });
+            console.log('Creating new branch from', config.git.baseBranch + ':', branchName);
+            cli_execute_command({ command: 'git checkout ' + config.git.baseBranch });
+            cli_execute_command({ command: 'git pull origin ' + config.git.baseBranch });
             cli_execute_command({ command: 'git checkout -b ' + branchName });
         }
     }
@@ -104,6 +105,7 @@ function action(params) {
         var actualParams = params.inputFolderPath ? params : (params.jobParams || params);
         var folder = actualParams.inputFolderPath;
         var ticketKey = folder.split('/').pop();
+        var config = configLoader.loadProjectConfig(params.jobParams || params);
 
         console.log('=== Test automation setup for:', ticketKey, '===');
 
@@ -117,7 +119,7 @@ function action(params) {
 
         // Step 2: Create/checkout test/{KEY} branch from main
         try {
-            checkoutBranch(ticketKey);
+            checkoutBranch(ticketKey, config);
         } catch (e) {
             console.error('Branch checkout failed (non-fatal):', e);
         }

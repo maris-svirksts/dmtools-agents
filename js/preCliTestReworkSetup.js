@@ -4,6 +4,7 @@
  * not feature ai/{TICKET-KEY} branches.
  */
 
+var configLoader = require('./configLoader.js');
 const gh = require('./common/githubHelpers.js');
 const fetchQuestionsToInput = require('./fetchQuestionsToInput.js');
 const fetchLinkedBugsToInput = require('./fetchLinkedBugsToInput.js');
@@ -35,6 +36,7 @@ function action(params) {
         var actualParams = params.inputFolderPath ? params : (params.jobParams || params);
         var inputFolder = actualParams.inputFolderPath;
         var ticketKey = inputFolder.split('/').pop();
+        var config = configLoader.loadProjectConfig(params.jobParams || params);
 
         console.log('=== Test rework setup for:', ticketKey, '===');
 
@@ -91,13 +93,13 @@ function action(params) {
             try {
                 const ticket = jira_get_ticket({ key: ticketKey });
                 const summary = ticket && ticket.fields ? (ticket.fields.summary || ticketKey) : ticketKey;
-                const prTitle = ticketKey + ' ' + summary + ' (rework)';
+                const prTitle = configLoader.formatTemplate(config.formats.prTitle.rework, {ticketKey: ticketKey, ticketSummary: summary});
 
                 const prData = JSON.stringify({
                     title: prTitle,
                     body: 'Auto-created PR for rework of test automation.\n\nTicket: ' + ticketKey,
                     head: testBranchName,
-                    base: 'main'
+                    base: config.git.baseBranch
                 });
                 file_write({ path: 'pr_create_' + ticketKey + '.json', content: prData });
 
@@ -154,7 +156,7 @@ function action(params) {
         }
 
         // Step 5: Diff + discussions
-        const baseBranch = prDetails.base ? prDetails.base.ref : 'main';
+        const baseBranch = prDetails.base ? prDetails.base.ref : config.git.baseBranch;
 
         // Step 4.5: Merge base branch and detect conflicts
         const conflictFiles = gh.detectMergeConflicts(baseBranch, inputFolder);

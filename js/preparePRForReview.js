@@ -6,12 +6,14 @@
  * 4. Posts "Review Started" comment to Jira
  */
 
+var configLoader = require('./configLoader.js');
 const gh = require('./common/githubHelpers.js');
 
 function action(params) {
     try {
         const inputFolder = params.inputFolderPath;
         const ticketKey = inputFolder.split('/').pop();
+        var config = configLoader.loadProjectConfig(params.jobParams || params);
 
         console.log('=== Preparing PR for review:', ticketKey, '===');
 
@@ -63,7 +65,7 @@ function action(params) {
         }
 
         // Step 5: Diff + discussions (human-readable + raw with IDs)
-        const baseBranch = prDetails.base ? prDetails.base.ref : 'main';
+        const baseBranch = prDetails.base ? prDetails.base.ref : config.git.baseBranch;
         const diff = gh.getPRDiff(baseBranch, branchName || (prDetails.head && prDetails.head.ref));
 
         console.log('Fetching PR discussions...');

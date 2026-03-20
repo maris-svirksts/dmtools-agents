@@ -5,6 +5,7 @@
 
 // Import common helper functions
 const { extractTicketKey } = require('./common/jiraHelpers.js');
+var configLoader = require('./configLoader.js');
 const { GIT_CONFIG, STATUSES, LABELS } = require('./config.js');
 
 /**
@@ -88,14 +89,14 @@ function generateUniqueBranchName(branchPrefix, ticketKey) {
  *
  * @returns {boolean} True if successful
  */
-function configureGitAuthor() {
+function configureGitAuthor(config) {
     try {
         cli_execute_command({
-            command: 'git config user.name "' + GIT_CONFIG.AUTHOR_NAME + '"'
+            command: 'git config user.name "' + config.git.authorName + '"'
         });
 
         cli_execute_command({
-            command: 'git config user.email "' + GIT_CONFIG.AUTHOR_EMAIL + '"'
+            command: 'git config user.email "' + config.git.authorEmail + '"'
         });
 
         console.log('✅ Configured git author as AI Teammate');
@@ -200,7 +201,7 @@ function performGitOperations(branchName, commitMessage) {
  * @param {string} branchName - Branch name to use as head
  * @returns {Object} Result with success status and PR URL
  */
-function createPullRequest(title, branchName) {
+function createPullRequest(title, branchName, baseBranch) {
     try {
         console.log('Creating Pull Request...');
 
@@ -216,7 +217,7 @@ function createPullRequest(title, branchName) {
         // Create PR using gh CLI with body-file
         // Explicitly specify --head to prevent interactive prompts in headless environment
         const output = cli_execute_command({
-            command: 'gh pr create --title "' + escapedTitle + '" --body-file "' + bodyFilePath + '" --base ' + GIT_CONFIG.DEFAULT_BASE_BRANCH + ' --head ' + branchName
+            command: 'gh pr create --title "' + escapedTitle + '" --body-file "' + bodyFilePath + '" --base ' + baseBranch + ' --head ' + branchName
         }) || '';
 
         console.log('Raw gh pr create output (length=' + output.length + '):');
@@ -440,6 +441,7 @@ function action(params) {
         // - Teammate workflow: params.ticket exists directly
         // - Standalone dmtools (JSRunner): params.jobParams.ticket
         const actualParams = params.ticket ? params : (params.jobParams || params);
+        var config = configLoader.loadProjectConfig(params.jobParams || params);
 
         const ticketKey = actualParams.ticket.key;
         const ticketSummary = actualParams.ticket.fields.summary;
@@ -485,7 +487,7 @@ function action(params) {
         }
 
         // Configure git author
-        if (!configureGitAuthor()) {
+        if (!configureGitAuthor(config)) {
             const error = 'Failed to configure git author';
             postErrorCommentToJira(ticketKey, 'Git Configuration', error);
             return {
@@ -507,7 +509,7 @@ function action(params) {
         console.log('Using current branch:', branchName);
 
         // Prepare commit message
-        const commitMessage = ticketKey + ' ' + ticketSummary;
+        const commitMessage = configLoader.formatTemplate(config.formats.commitMessage.development, {ticketKey: ticketKey, ticketSummary: ticketSummary});
 
         // Perform git operations
         const gitResult = performGitOperations(branchName, commitMessage);
@@ -581,8 +583,8 @@ function action(params) {
         console.log('Using outputs/response.md as PR body (' + responseContent.length + ' characters)');
 
         // Create Pull Request
-        const prTitle = ticketKey + ' ' + ticketSummary;
-        const prResult = createPullRequest(prTitle, branchName);
+        const prTitle = configLoader.formatTemplate(config.formats.prTitle.development, {ticketKey: ticketKey, ticketSummary: ticketSummary});
+        const prResult = createPullRequest(prTitle, branchName, config.git.baseBranch);
 
         if (!prResult.success) {
             postErrorCommentToJira(ticketKey, 'Pull Request Creation', prResult.error);

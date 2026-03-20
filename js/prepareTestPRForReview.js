@@ -4,6 +4,7 @@
  * not feature ai/{TICKET-KEY} branches.
  */
 
+var configLoader = require('./configLoader.js');
 const gh = require('./common/githubHelpers.js');
 
 function findTestPRForTicket(workspace, repository, ticketKey) {
@@ -42,6 +43,7 @@ function action(params) {
     try {
         const inputFolder = params.inputFolderPath;
         const ticketKey = inputFolder.split('/').pop();
+        var config = configLoader.loadProjectConfig(params.jobParams || params);
 
         console.log('=== Preparing test PR for review:', ticketKey, '===');
 
@@ -83,13 +85,13 @@ function action(params) {
             try {
                 const ticket = jira_get_ticket({ key: ticketKey });
                 const summary = ticket && ticket.fields ? (ticket.fields.summary || ticketKey) : ticketKey;
-                const prTitle = ticketKey + ' ' + summary;
+                const prTitle = configLoader.formatTemplate(config.formats.prTitle.testAutomation, {ticketKey: ticketKey, ticketSummary: summary});
 
                 const prData = JSON.stringify({
                     title: prTitle,
                     body: 'Auto-created PR for test automation review.\n\nTicket: ' + ticketKey,
                     head: branchName,
-                    base: 'main'
+                    base: config.git.baseBranch
                 });
                 file_write({ path: 'pr_create_' + ticketKey + '.json', content: prData });
 
@@ -159,7 +161,7 @@ function action(params) {
         }
 
         // Step 5: Diff + discussions
-        const baseBranch = prDetails.base ? prDetails.base.ref : 'main';
+        const baseBranch = prDetails.base ? prDetails.base.ref : config.git.baseBranch;
         const diff = gh.getPRDiff(baseBranch, branchName || (prDetails.head && prDetails.head.ref));
 
         console.log('Fetching PR discussions...');

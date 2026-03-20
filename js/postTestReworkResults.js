@@ -10,6 +10,7 @@
  * 7. Posts Jira comment, removes WIP label
  */
 
+var configLoader = require('./configLoader.js');
 const { GIT_CONFIG, STATUSES, LABELS } = require('./config.js');
 
 function cleanCommandOutput(output) {
@@ -72,7 +73,7 @@ function findTestPRForTicket(workspace, repository, ticketKey) {
     }
 }
 
-function commitAndPush(ticketKey, passed) {
+function commitAndPush(ticketKey, passed, config) {
     const branchName = cleanCommandOutput(
         cli_execute_command({ command: 'git branch --show-current' }) || ''
     );
@@ -95,8 +96,9 @@ function commitAndPush(ticketKey, passed) {
     var localSha = '';
     if (statusOutput.trim()) {
         const result = passed ? 'fix' : 'update';
+        var reworkCommitMsg = configLoader.formatTemplate(config.formats.commitMessage.testRework, {ticketKey: ticketKey, result: result});
         cli_execute_command({
-            command: 'git commit -m "' + ticketKey + ' test rework: ' + result + ' test after review"'
+            command: 'git commit -m "' + reworkCommitMsg.replace(/"/g, '\\"') + '"'
         });
         console.log('✅ Committed rework changes');
     } else {
@@ -130,7 +132,7 @@ function commitAndPush(ticketKey, passed) {
     return branchName;
 }
 
-function createPRIfMissing(owner, repo, branchName, ticketKey) {
+function createPRIfMissing(owner, repo, branchName, ticketKey, config) {
     try {
         const openPRs = github_list_prs({ workspace: owner, repository: repo, state: 'open' });
         const existing = openPRs.filter(function(pr) {
@@ -151,7 +153,7 @@ function createPRIfMissing(owner, repo, branchName, ticketKey) {
             title: prTitle,
             body: 'Auto-created PR after test rework.\n\nTicket: ' + ticketKey,
             head: branchName,
-            base: 'main'
+            base: config.git.baseBranch
         });
         file_write({ path: 'pr_post_rework_' + ticketKey + '.json', content: prData });
 
@@ -247,6 +249,7 @@ function action(params) {
 
     try {
         const fixSummary = actualParams.response || '_(No fix summary)_';
+        var config = configLoader.loadProjectConfig(params.jobParams || params);
 
         console.log('=== Processing test rework results for', ticketKey, '===');
 
@@ -273,13 +276,13 @@ function action(params) {
 
         // Step 2: Configure git + commit/push testing/ only
         try {
-            cli_execute_command({ command: 'git config user.name "' + GIT_CONFIG.AUTHOR_NAME + '"' });
-            cli_execute_command({ command: 'git config user.email "' + GIT_CONFIG.AUTHOR_EMAIL + '"' });
+            cli_execute_command({ command: 'git config user.name "' + config.git.authorName + '"' });
+            cli_execute_command({ command: 'git config user.email "' + config.git.authorEmail + '"' });
         } catch (e) {}
 
         let branchName;
         try {
-            branchName = commitAndPush(ticketKey, passed);
+            branchName = commitAndPush(ticketKey, passed, config);
         } catch (e) {
             console.error('Git operations failed:', e);
             jira_post_comment({
@@ -294,7 +297,7 @@ function action(params) {
         const repoInfo = getGitHubRepoInfo();
         var pr = repoInfo ? findTestPRForTicket(repoInfo.owner, repoInfo.repo, ticketKey) : null;
         if (!pr && repoInfo && branchName) {
-            pr = createPRIfMissing(repoInfo.owner, repoInfo.repo, branchName, ticketKey);
+            pr = createPRIfMissing(repoInfo.owner, repoInfo.repo, branchName, ticketKey, config);
         }
 
         if (pr && repoInfo) {

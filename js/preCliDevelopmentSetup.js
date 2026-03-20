@@ -8,6 +8,7 @@
  * Used by: story_development.json, test_case_automation.json
  */
 
+var configLoader = require('./configLoader.js');
 const { GIT_CONFIG, STATUSES } = require('./config.js');
 const fetchQuestionsToInput = require('./fetchQuestionsToInput.js');
 const fetchLinkedTestsToInput = require('./fetchLinkedTestsToInput.js');
@@ -30,13 +31,13 @@ function cleanCommandOutput(output) {
     return lines.join('\n').trim();
 }
 
-function checkoutBranch(ticketKey) {
-    var branchName = 'ai/' + ticketKey;
+function checkoutBranch(ticketKey, config) {
+    var branchName = configLoader.formatBranchName(config.git.branchPrefix.development, ticketKey);
     console.log('Setting up branch:', branchName);
 
     try {
-        cli_execute_command({ command: 'git config user.name "' + GIT_CONFIG.AUTHOR_NAME + '"' });
-        cli_execute_command({ command: 'git config user.email "' + GIT_CONFIG.AUTHOR_EMAIL + '"' });
+        cli_execute_command({ command: 'git config user.name "' + config.git.authorName + '"' });
+        cli_execute_command({ command: 'git config user.email "' + config.git.authorEmail + '"' });
     } catch (e) {
         console.warn('Failed to configure git author:', e);
     }
@@ -60,7 +61,7 @@ function checkoutBranch(ticketKey) {
         cli_execute_command({ command: 'git checkout ' + branchName });
         try {
             var rebaseOutput = cleanCommandOutput(
-                cli_execute_command({ command: 'git rebase origin/' + GIT_CONFIG.DEFAULT_BASE_BRANCH }) || ''
+                cli_execute_command({ command: 'git rebase origin/' + config.git.baseBranch }) || ''
             );
             if (rebaseOutput.indexOf('CONFLICT') !== -1) {
                 throw new Error('Rebase conflict detected: ' + rebaseOutput.substring(0, 200));
@@ -68,7 +69,7 @@ function checkoutBranch(ticketKey) {
         } catch (rebaseErr) {
             console.warn('Rebase failed, resetting to main:', rebaseErr);
             try { cli_execute_command({ command: 'git rebase --abort' }); } catch (_) {}
-            cli_execute_command({ command: 'git reset --hard origin/' + GIT_CONFIG.DEFAULT_BASE_BRANCH });
+            cli_execute_command({ command: 'git reset --hard origin/' + config.git.baseBranch });
         }
     } else {
         var remoteBranches = '';
@@ -84,7 +85,7 @@ function checkoutBranch(ticketKey) {
             cli_execute_command({ command: 'git checkout -b ' + branchName + ' origin/' + branchName });
             try {
                 var rebaseOutput2 = cleanCommandOutput(
-                    cli_execute_command({ command: 'git rebase origin/' + GIT_CONFIG.DEFAULT_BASE_BRANCH }) || ''
+                    cli_execute_command({ command: 'git rebase origin/' + config.git.baseBranch }) || ''
                 );
                 if (rebaseOutput2.indexOf('CONFLICT') !== -1) {
                     throw new Error('Rebase conflict detected: ' + rebaseOutput2.substring(0, 200));
@@ -92,12 +93,12 @@ function checkoutBranch(ticketKey) {
             } catch (rebaseErr) {
                 console.warn('Rebase failed, resetting to main:', rebaseErr);
                 try { cli_execute_command({ command: 'git rebase --abort' }); } catch (_) {}
-                cli_execute_command({ command: 'git reset --hard origin/' + GIT_CONFIG.DEFAULT_BASE_BRANCH });
+                cli_execute_command({ command: 'git reset --hard origin/' + config.git.baseBranch });
             }
         } else {
-            console.log('Creating new branch from', GIT_CONFIG.DEFAULT_BASE_BRANCH + ':', branchName);
-            cli_execute_command({ command: 'git checkout ' + GIT_CONFIG.DEFAULT_BASE_BRANCH });
-            cli_execute_command({ command: 'git pull origin ' + GIT_CONFIG.DEFAULT_BASE_BRANCH });
+            console.log('Creating new branch from', config.git.baseBranch + ':', branchName);
+            cli_execute_command({ command: 'git checkout ' + config.git.baseBranch });
+            cli_execute_command({ command: 'git pull origin ' + config.git.baseBranch });
             cli_execute_command({ command: 'git checkout -b ' + branchName });
         }
     }
@@ -111,6 +112,7 @@ function action(params) {
         // - Teammate workflow: params.inputFolderPath exists directly
         // - Standalone dmtools (JSRunner): params.jobParams.inputFolderPath
         var actualParams = params.inputFolderPath ? params : (params.jobParams || params);
+        var config = configLoader.loadProjectConfig(params.jobParams || params);
 
         var folder = actualParams.inputFolderPath;
         var ticketKey = folder.split('/').pop();
@@ -125,7 +127,7 @@ function action(params) {
 
         // 2. Checkout or create feature branch
         try {
-            checkoutBranch(ticketKey);
+            checkoutBranch(ticketKey, config);
         } catch (e) {
             console.error('Branch checkout failed (non-fatal):', e);
         }

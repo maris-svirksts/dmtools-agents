@@ -10,6 +10,7 @@
  * 7. Removes WIP label
  */
 
+var configLoader = require('./configLoader.js');
 const { GIT_CONFIG, STATUSES, LABELS } = require('./config.js');
 
 function cleanCommandOutput(output) {
@@ -116,7 +117,7 @@ function performGitOperations(branchName, commitMessage) {
     }
 }
 
-function createPullRequest(title, branchName) {
+function createPullRequest(title, branchName, baseBranch) {
     try {
         console.log('Creating Pull Request...');
         const escapedTitle = title.replace(/"/g, '\\"').replace(/\n/g, ' ');
@@ -129,7 +130,7 @@ function createPullRequest(title, branchName) {
 
         const output = cleanCommandOutput(
             cli_execute_command({
-                command: 'gh pr create --title "' + escapedTitle + '" --body-file "' + prBodyFile + '" --base ' + GIT_CONFIG.DEFAULT_BASE_BRANCH + ' --head ' + branchName
+                command: 'gh pr create --title "' + escapedTitle + '" --body-file "' + prBodyFile + '" --base ' + baseBranch + ' --head ' + branchName
             }) || ''
         );
 
@@ -178,6 +179,7 @@ function action(params) {
         const ticketSummary = params.ticket.fields ? params.ticket.fields.summary : ticketKey;
         const projectKey = ticketKey.split('-')[0];
         const jiraComment = params.response || '';
+        var config = configLoader.loadProjectConfig(params.jobParams || params);
 
         console.log('=== Processing test automation results for', ticketKey, '===');
 
@@ -197,8 +199,8 @@ function action(params) {
 
         // Step 2: Configure git author
         try {
-            cli_execute_command({ command: 'git config user.name "' + GIT_CONFIG.AUTHOR_NAME + '"' });
-            cli_execute_command({ command: 'git config user.email "' + GIT_CONFIG.AUTHOR_EMAIL + '"' });
+            cli_execute_command({ command: 'git config user.name "' + config.git.authorName + '"' });
+            cli_execute_command({ command: 'git config user.email "' + config.git.authorEmail + '"' });
         } catch (e) {
             console.warn('Failed to configure git author:', e);
         }
@@ -216,12 +218,12 @@ function action(params) {
         let prUrl = null;
         let noCodeChanges = false;
         if (branchName) {
-            const commitMessage = ticketKey + ' test: automate ' + ticketSummary;
+            const commitMessage = configLoader.formatTemplate(config.formats.commitMessage.testAutomation, {ticketKey: ticketKey, ticketSummary: ticketSummary});
             const gitResult = performGitOperations(branchName, commitMessage);
 
             if (gitResult.success && !gitResult.noNewCommit) {
-                const prTitle = ticketKey + ' ' + ticketSummary;
-                const prResult = createPullRequest(prTitle, branchName);
+                const prTitle = configLoader.formatTemplate(config.formats.prTitle.testAutomation, {ticketKey: ticketKey, ticketSummary: ticketSummary});
+                const prResult = createPullRequest(prTitle, branchName, config.git.baseBranch);
                 prUrl = prResult.prUrl;
                 if (!prResult.success || !prUrl) {
                     // PR creation failed — branch has code but no PR; post comment and reset to Backlog for retry
