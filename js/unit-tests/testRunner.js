@@ -241,4 +241,6 @@ function action(params) {
     };
 }
 
-module.exports = { action: action };
+if (typeof module !== 'undefined') {
+    module.exports = { action: action };
+}

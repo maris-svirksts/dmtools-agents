@@ -140,7 +140,7 @@ function action(params) {
         // 2. Create question subtasks
         var createdTickets = [];
         questions.forEach(function(entry) {
-            var key = createQuestion(entry, ticketKey, projectKey, jiraConfig);
+            var key = createQuestion(entry, ticketKey, projectKey, Object.assign({}, jiraConfig, { labels: labels }));
             createdTickets.push({
                 summary: ensureQPrefix(entry.summary || ''),
                 priority: entry.priority,

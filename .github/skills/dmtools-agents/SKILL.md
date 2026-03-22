@@ -360,10 +360,59 @@ Use when the SM runs in repo A but should trigger workflows in repo B
     owner: 'product-org',
     repo: 'product-repo',
     baseBranch: 'main',
-    workingDir: 'product-repo'  // checkout dir in workflow
+    workingDir: 'dependencies/product-repo'  // relative path where repo is checked out in workflow
   }
 }
 ```
+
+---
+
+## workingDir — Multi-Repo Coding Agents
+
+When an agent (e.g. `story_development`) needs to make code changes in a **dependency repository**
+that was checked out alongside the main repo (e.g. under `dependencies/`), set `workingDir` via
+`customParams.targetRepository.workingDir` in the agent JSON.
+
+All `cli_execute_command` calls in `preCliDevelopmentSetup.js` and `developTicketAndCreatePR.js`
+automatically use this directory for `git` and `gh` operations — no JS changes needed.
+
+### How it works
+
+1. The workflow checks out extra repos into `dependencies/<repo-name>/` via `checkout-project-dependencies` action
+2. The agent JSON sets `customParams.targetRepository.workingDir: "dependencies/<repo-name>"`
+3. `configLoader.loadProjectConfig()` reads `workingDir` and stores it as `config.workingDir`
+4. All `cli_execute_command` calls in dev scripts pass `workingDirectory: config.workingDir`
+
+### Example — MAPC mobile app development
+
+Agent JSON (`ai_teammate/mapc/story_development.json`):
+```json
+{
+  "params": {
+    "customParams": {
+      "targetRepository": {
+        "owner": "my-org",
+        "repo": "mobile-app",
+        "baseBranch": "develop",
+        "workingDir": "dependencies/mobile-app"
+      }
+    }
+  }
+}
+```
+
+`repositories.json` (checkout-project-dependencies):
+```json
+{
+  "mapc": [
+    {"repo": "my-org/mobile-app", "branch": "develop"},
+    {"repo": "my-org/backend", "branch": "master"}
+  ]
+}
+```
+
+Git operations (`git checkout`, `git push`, `gh pr create`) all run inside
+`dependencies/mobile-app/` — PRs are created against the correct repo automatically.
 
 ---
 

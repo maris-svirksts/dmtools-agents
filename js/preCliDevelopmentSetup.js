@@ -13,6 +13,15 @@ const { GIT_CONFIG, STATUSES } = require('./config.js');
 const fetchQuestionsToInput = require('./fetchQuestionsToInput.js');
 const fetchLinkedTestsToInput = require('./fetchLinkedTestsToInput.js');
 
+// Universal working-directory-aware wrapper for cli_execute_command.
+// When config.workingDir is set (via customParams.targetRepository.workingDir),
+// all git/shell commands are executed inside that directory.
+var _workingDir = null;
+function runCmd(args) {
+    if (_workingDir) args.workingDirectory = _workingDir;
+    return cli_execute_command(args);
+}
+
 /**
  * Clean command output from script wrapper artifacts
  * @param {string} output - Raw command output
@@ -32,25 +41,26 @@ function cleanCommandOutput(output) {
 }
 
 function checkoutBranch(ticketKey, config) {
+    _workingDir = config.workingDir || null;
     var branchName = configLoader.formatBranchName(config.git.branchPrefix.development, ticketKey);
     console.log('Setting up branch:', branchName);
 
     try {
-        cli_execute_command({ command: 'git config user.name "' + config.git.authorName + '"' });
-        cli_execute_command({ command: 'git config user.email "' + config.git.authorEmail + '"' });
+        runCmd({ command: 'git config user.name "' + config.git.authorName + '"' });
+        runCmd({ command: 'git config user.email "' + config.git.authorEmail + '"' });
     } catch (e) {
         console.warn('Failed to configure git author:', e);
     }
 
     try {
-        cli_execute_command({ command: 'git fetch origin --prune' });
+        runCmd({ command: 'git fetch origin --prune' });
     } catch (e) {
         console.warn('Could not fetch remote branches:', e);
     }
 
     var localBranches = '';
     try {
-        var rawLocal = cli_execute_command({ command: 'git branch --list "' + branchName + '"' }) || '';
+        var rawLocal = runCmd({ command: 'git branch --list "' + branchName + '"' }) || '';
         localBranches = cleanCommandOutput(rawLocal);
     } catch (e) {
         console.warn('Error checking local branches:', e);
@@ -58,23 +68,23 @@ function checkoutBranch(ticketKey, config) {
 
     if (localBranches.trim()) {
         console.log('Branch exists locally, rebasing from main:', branchName);
-        cli_execute_command({ command: 'git checkout ' + branchName });
+        runCmd({ command: 'git checkout ' + branchName });
         try {
             var rebaseOutput = cleanCommandOutput(
-                cli_execute_command({ command: 'git rebase origin/' + config.git.baseBranch }) || ''
+                runCmd({ command: 'git rebase origin/' + config.git.baseBranch }) || ''
             );
             if (rebaseOutput.indexOf('CONFLICT') !== -1) {
                 throw new Error('Rebase conflict detected: ' + rebaseOutput.substring(0, 200));
             }
         } catch (rebaseErr) {
             console.warn('Rebase failed, resetting to main:', rebaseErr);
-            try { cli_execute_command({ command: 'git rebase --abort' }); } catch (_) {}
-            cli_execute_command({ command: 'git reset --hard origin/' + config.git.baseBranch });
+            try { runCmd({ command: 'git rebase --abort' }); } catch (_) {}
+            runCmd({ command: 'git reset --hard origin/' + config.git.baseBranch });
         }
     } else {
         var remoteBranches = '';
         try {
-            var rawRemote = cli_execute_command({ command: 'git ls-remote --heads origin ' + branchName }) || '';
+            var rawRemote = runCmd({ command: 'git ls-remote --heads origin ' + branchName }) || '';
             remoteBranches = cleanCommandOutput(rawRemote);
         } catch (e) {
             console.warn('Error checking remote branches:', e);
@@ -82,24 +92,24 @@ function checkoutBranch(ticketKey, config) {
 
         if (remoteBranches.trim()) {
             console.log('Branch exists on remote, checking out and rebasing from main:', branchName);
-            cli_execute_command({ command: 'git checkout -b ' + branchName + ' origin/' + branchName });
+            runCmd({ command: 'git checkout -b ' + branchName + ' origin/' + branchName });
             try {
                 var rebaseOutput2 = cleanCommandOutput(
-                    cli_execute_command({ command: 'git rebase origin/' + config.git.baseBranch }) || ''
+                    runCmd({ command: 'git rebase origin/' + config.git.baseBranch }) || ''
                 );
                 if (rebaseOutput2.indexOf('CONFLICT') !== -1) {
                     throw new Error('Rebase conflict detected: ' + rebaseOutput2.substring(0, 200));
                 }
             } catch (rebaseErr) {
                 console.warn('Rebase failed, resetting to main:', rebaseErr);
-                try { cli_execute_command({ command: 'git rebase --abort' }); } catch (_) {}
-                cli_execute_command({ command: 'git reset --hard origin/' + config.git.baseBranch });
+                try { runCmd({ command: 'git rebase --abort' }); } catch (_) {}
+                runCmd({ command: 'git reset --hard origin/' + config.git.baseBranch });
             }
         } else {
             console.log('Creating new branch from', config.git.baseBranch + ':', branchName);
-            cli_execute_command({ command: 'git checkout ' + config.git.baseBranch });
-            cli_execute_command({ command: 'git pull origin ' + config.git.baseBranch });
-            cli_execute_command({ command: 'git checkout -b ' + branchName });
+            runCmd({ command: 'git checkout ' + config.git.baseBranch });
+            runCmd({ command: 'git pull origin ' + config.git.baseBranch });
+            runCmd({ command: 'git checkout -b ' + branchName });
         }
     }
 

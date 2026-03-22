@@ -8,6 +8,15 @@ const { extractTicketKey } = require('./common/jiraHelpers.js');
 var configLoader = require('./configLoader.js');
 const { GIT_CONFIG, STATUSES, LABELS } = require('./config.js');
 
+// Universal working-directory-aware wrapper for cli_execute_command.
+// When config.workingDir is set (via customParams.targetRepository.workingDir),
+// all git/shell commands are executed inside that directory.
+var _workingDir = null;
+function runCmd(args) {
+    if (_workingDir) args.workingDirectory = _workingDir;
+    return cli_execute_command(args);
+}
+
 /**
  * Clean command output from script wrapper artifacts
  * Removes "Script started/done" lines that DMTools CLI adds
@@ -42,7 +51,7 @@ function generateUniqueBranchName(branchPrefix, ticketKey) {
     try {
         // Fetch latest remote branches without pulling
         try {
-            cli_execute_command({
+            runCmd({
                 command: 'git fetch origin --prune'
             });
         } catch (fetchError) {
@@ -50,12 +59,12 @@ function generateUniqueBranchName(branchPrefix, ticketKey) {
         }
 
         // Check local branches
-        const localBranches = cli_execute_command({
+        const localBranches = runCmd({
             command: 'git branch --list "*' + baseBranchName + '*"'
         }) || '';
 
         // Check remote branches
-        const remoteBranches = cli_execute_command({
+        const remoteBranches = runCmd({
             command: 'git branch --remotes --list "origin/' + baseBranchName + '*"'
         }) || '';
 
@@ -91,11 +100,11 @@ function generateUniqueBranchName(branchPrefix, ticketKey) {
  */
 function configureGitAuthor(config) {
     try {
-        cli_execute_command({
+        runCmd({
             command: 'git config user.name "' + config.git.authorName + '"'
         });
 
-        cli_execute_command({
+        runCmd({
             command: 'git config user.email "' + config.git.authorEmail + '"'
         });
 
@@ -119,12 +128,12 @@ function performGitOperations(branchName, commitMessage) {
     try {
         // Stage all changes
         console.log('Staging changes...');
-        cli_execute_command({
+        runCmd({
             command: 'git add .'
         });
 
         // Check if there are changes to commit
-        const rawStatusOutput = cli_execute_command({
+        const rawStatusOutput = runCmd({
             command: 'git status --porcelain'
         });
         const statusOutput = cleanCommandOutput(rawStatusOutput);
@@ -139,13 +148,13 @@ function performGitOperations(branchName, commitMessage) {
 
         // Commit changes
         console.log('Committing changes...');
-        cli_execute_command({
+        runCmd({
             command: 'git commit -m "' + commitMessage.replace(/"/g, '\\"') + '"'
         });
 
         // Push to remote
         console.log('Pushing to remote...');
-        const pushOutput = cli_execute_command({
+        const pushOutput = runCmd({
             command: 'git push -u origin ' + branchName
         }) || '';
 
@@ -165,7 +174,7 @@ function performGitOperations(branchName, commitMessage) {
 
         // Verify branch is actually present on remote
         console.log('Verifying branch is pushed to remote...');
-        const lsRemoteOutput = cli_execute_command({
+        const lsRemoteOutput = runCmd({
             command: 'git ls-remote --heads origin ' + branchName
         }) || '';
 
@@ -216,7 +225,7 @@ function createPullRequest(title, branchName, baseBranch) {
 
         // Create PR using gh CLI with body-file
         // Explicitly specify --head to prevent interactive prompts in headless environment
-        const output = cli_execute_command({
+        const output = runCmd({
             command: 'gh pr create --title "' + escapedTitle + '" --body-file "' + bodyFilePath + '" --base ' + baseBranch + ' --head ' + branchName
         }) || '';
 
@@ -241,7 +250,7 @@ function createPullRequest(title, branchName, baseBranch) {
             if (prNumberMatch) {
                 // Get repo info from git remote
                 try {
-                    const remoteUrl = cli_execute_command({
+                    const remoteUrl = runCmd({
                         command: 'git config --get remote.origin.url'
                     }) || '';
                     const repoMatch = remoteUrl.match(/github\.com[:/]([^/]+\/[^/.]+)/);
@@ -259,7 +268,7 @@ function createPullRequest(title, branchName, baseBranch) {
         // Pattern 3: If still not found, query gh pr list for this branch
         if (!prUrl) {
             try {
-                const prListOutput = cli_execute_command({
+                const prListOutput = runCmd({
                     command: 'gh pr list --head ' + branchName + ' --json url --jq ".[0].url"'
                 }) || '';
                 const cleanedUrl = cleanCommandOutput(prListOutput);
@@ -293,7 +302,7 @@ function createPullRequest(title, branchName, baseBranch) {
         if (errMsg.indexOf('already exists') !== -1 || errMsg.indexOf('pull request for branch') !== -1) {
             console.log('PR already exists for branch', branchName, '— looking up existing PR URL...');
             try {
-                const existingPrUrl = cli_execute_command({
+                const existingPrUrl = runCmd({
                     command: 'gh pr list --head ' + branchName + ' --json url --jq ".[0].url"'
                 }) || '';
                 const cleanedExistingUrl = cleanCommandOutput(existingPrUrl);
@@ -406,7 +415,7 @@ function retryAfterPushFailure(ticketKey, branchName, pushError) {
 
     // For non-fast-forward: force push (branch diverged from remote, our local is newer)
     console.log('Retrying with force push...');
-    var retryOutput = cli_execute_command({ command: 'git push -u origin ' + branchName + ' --force' }) || '';
+    var retryOutput = runCmd({ command: 'git push -u origin ' + branchName + ' --force' }) || '';
     var retryFailed = retryOutput.indexOf('remote rejected') !== -1 ||
                       retryOutput.indexOf('GH013') !== -1 ||
                       retryOutput.indexOf('error: failed to push') !== -1 ||
@@ -417,7 +426,7 @@ function retryAfterPushFailure(ticketKey, branchName, pushError) {
     }
 
     // Verify branch is on remote
-    var lsOutput = cli_execute_command({ command: 'git ls-remote --heads origin ' + branchName }) || '';
+    var lsOutput = runCmd({ command: 'git ls-remote --heads origin ' + branchName }) || '';
     if (lsOutput.indexOf('refs/heads/' + branchName) === -1) {
         return { success: false, error: 'Branch not found on remote after retry push' };
     }
@@ -442,6 +451,7 @@ function action(params) {
         // - Standalone dmtools (JSRunner): params.jobParams.ticket
         const actualParams = params.ticket ? params : (params.jobParams || params);
         var config = configLoader.loadProjectConfig(params.jobParams || params);
+        _workingDir = config.workingDir || null;
 
         const ticketKey = actualParams.ticket.key;
         const ticketSummary = actualParams.ticket.fields.summary;
@@ -456,7 +466,7 @@ function action(params) {
         // the ticket to In Review. Move now and skip re-development.
         const expectedBranch = configLoader.formatBranchName(config.git.branchPrefix.development, ticketKey);
         try {
-            const existingPrJson = cli_execute_command({
+            const existingPrJson = runCmd({
                 command: 'gh pr list --head ' + expectedBranch + ' --state open --json url,number --jq ".[0]"'
             }) || '';
             const cleanedPrJson = existingPrJson.split('\n').filter(function(l) {
@@ -497,7 +507,7 @@ function action(params) {
         }
 
         // Branch was already checked out by preCliJSAction — read current branch
-        const rawBranchOutput = cli_execute_command({ command: 'git branch --show-current' }) || '';
+        const rawBranchOutput = runCmd({ command: 'git branch --show-current' }) || '';
         const branchName = cleanCommandOutput(rawBranchOutput);
 
         if (!branchName) {

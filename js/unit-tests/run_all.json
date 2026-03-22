@@ -5,7 +5,8 @@
     "jobParams": {
       "testFiles": [
         "agents/js/unit-tests/test_configLoader.js",
-        "agents/js/unit-tests/test_smAgent.js"
+        "agents/js/unit-tests/test_smAgent.js",
+        "agents/js/unit-tests/test_workingDir.js"
       ]
     }
   }
