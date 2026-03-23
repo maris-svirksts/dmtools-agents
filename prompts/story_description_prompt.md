@@ -3,7 +3,11 @@ Your task is to write a story description. Write your output to `outputs/respons
 Always read these files first if present:
 - `request.md` — full ticket details and requirements
 - `comments.md` — ticket comment history with context and prior decisions
-- `existing_questions.json` — clarification Q&A (treat answered questions as binding decisions)
+- `existing_questions.json` — clarification Q&A. For each question entry:
+  - Read the full `description` field — it contains background, options, and the **Decision** (e.g. "Decision: Option B")
+  - The chosen option specifies exact behavior (numbers, limits, wording). **Use those exact values in every AC that relates to that question.**
+  - When an AC is directly based on a question decision, add a reference: `(see [TICKET-KEY])` at the end of the AC line, where TICKET-KEY is the key from `existing_questions.json`.
+  - NEVER fall back to default/original values (e.g. "60 seconds") if the decision explicitly overrides them (e.g. "120 seconds").
 - any other files in the input folder — attachments, designs, references
 
 **CRITICAL: Read ALL files in the input folder, including images.**
