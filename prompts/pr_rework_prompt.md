@@ -30,12 +30,12 @@ Run `mkdir -p outputs` first to ensure the directory exists.
 
 Write two output files:
 
-**`outputs/response.md`** — general fix summary (will be posted as a PR comment):
-- For each review thread: describe what was changed to address it
-- List any issues you could NOT fix and explain why
-- Confirm test status (pass/fail) and test changes made
+**`outputs/response.md`** — detailed fix summary posted as a **GitHub PR comment** (this IS a PR conversation, write as much technical detail as needed):
+- For each review thread: what was changed, why, and any trade-offs
+- Any issues you could NOT fix and a clear explanation of why
+- Test status (pass/fail) and any test changes made
 
-**`outputs/review_replies.json`** — short reply for each review thread (will be posted as replies inside each discussion):
+**`outputs/review_replies.json`** — concise per-thread reply (posted inline in each discussion thread — 1-3 sentences, just enough to confirm the fix):
 ```json
 {
   "replies": [

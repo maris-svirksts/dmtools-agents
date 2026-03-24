@@ -6,8 +6,15 @@ User request is in 'input' folder, read all files there and do what is requested
 3. `comments.md` *(if present)* — ticket comment history with additional context, prior decisions, or linked information
 4. `existing_questions.json` — clarification questions with answers from the PO. Treat answered questions as binding requirements that override or clarify the description.
 
-Implement the ticket requirements including code implementation and unit tests. Aim for 100% unit test coverage on all new and modified code. Write a comprehensive development summary to outputs/response.md explaining your approach, changes, tests, and any issues.
+Implement the ticket requirements including code implementation and unit tests. Aim for 100% unit test coverage on all new and modified code.
 
 **OUT OF SCOPE**: E2E automation is not part of this task — focus on unit tests only.
 
 DO NOT create branches or push — focus only on code implementation. You must compile and run tests before finishing.
+
+Write `outputs/response.md` as the **PR description** (this will be published as the GitHub PR body — write technical detail here):
+- Implementation approach and key decisions
+- Summary of files changed and why
+- How to verify the fix / test results
+
+**Keep the PR description focused and technical** — avoid restating the ticket requirements verbatim. A developer reading the PR should immediately understand what was done and how to verify it.

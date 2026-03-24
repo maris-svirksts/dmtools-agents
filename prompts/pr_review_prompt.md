@@ -89,5 +89,15 @@ This is the machine-readable result consumed by the post-action. If it is missin
 ### 2. `outputs/pr_review_general.md` — REQUIRED
 GitHub-formatted general PR comment (referenced in `pr_review.json` → `generalComment`).
 
+**This is where all technical detail belongs.** Write a comprehensive review here: every finding with file paths, line numbers, code snippets, and clear explanation. Reviewers read this on the PR — give them everything they need.
+
 ### 3. `outputs/response.md` — REQUIRED
 Jira-formatted review summary posted as a ticket comment.
+
+**Keep this SHORT** — 5-8 lines maximum. It is a Jira ticket update, not a technical document. Include only:
+- One-line verdict (APPROVE / REQUEST CHANGES / BLOCK)
+- Count of blocking / important / suggestion findings
+- PR link
+- One sentence on the most critical issue (if any)
+
+All technical details belong in `outputs/pr_review_general.md` (GitHub PR comment), not here.
