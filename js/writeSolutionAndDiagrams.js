@@ -8,6 +8,9 @@
  *   solutionField — Jira field name for solution content (default: JIRA_FIELDS.SOLUTION)
  *   diagramField  — Jira field name for diagram (default: JIRA_FIELDS.DIAGRAMS).
  *                   If empty string or not set, diagram is prepended to solution as {code:mermaid}.
+ *   outputType    — "replace" (default): overwrite solutionField with generated content.
+ *                   "append": read current value of solutionField, append generated content after a separator.
+ *                   Useful for tickets (e.g. bugs) where the field already has content that must be preserved.
  */
 
 const { LABELS, DIAGRAM_FORMAT, JIRA_FIELDS, STATUSES } = require('./config.js');
@@ -24,9 +27,10 @@ function action(params) {
         var customParams = (params.customParams) || (params.jobParams && params.jobParams.customParams) || {};
         var solutionField = customParams.solutionField || JIRA_FIELDS.SOLUTION;
         var diagramField  = (customParams.diagramField !== undefined) ? customParams.diagramField : JIRA_FIELDS.DIAGRAMS;
+        var outputType    = customParams.outputType || 'replace'; // 'replace' | 'append'
 
         console.log('Processing solution and diagrams for:', ticketKey);
-        console.log('Solution field: ' + solutionField + ', Diagram field: ' + (diagramField || '(none — will prepend to solution)'));
+        console.log('Solution field: ' + solutionField + ', Diagram field: ' + (diagramField || '(none — will prepend to solution)') + ', outputType: ' + outputType);
 
         // 1. Read solution from outputs/response.md
         var solution = '';
@@ -57,10 +61,25 @@ function action(params) {
             diagram = ''; // mark as handled
         }
 
-        // 4. Write to solution field
+        // 4. Write to solution field (replace or append)
         try {
-            jira_update_field({ key: ticketKey, field: solutionField, value: solution });
-            console.log('Updated "' + solutionField + '" field for ' + ticketKey);
+            var valueToWrite = solution;
+            if (outputType === 'append') {
+                var existing = '';
+                try {
+                    existing = jira_get_field({ key: ticketKey, field: solutionField }) || '';
+                    if (typeof existing === 'object') existing = JSON.stringify(existing);
+                    existing = existing.trim();
+                } catch (e) {
+                    console.warn('Could not read existing value of "' + solutionField + '", will append without prefix:', e);
+                }
+                valueToWrite = existing
+                    ? existing + '\n\n----\n\n' + solution
+                    : solution;
+                console.log('Appending to "' + solutionField + '" (' + (existing ? existing.length : 0) + ' existing chars)');
+            }
+            jira_update_field({ key: ticketKey, field: solutionField, value: valueToWrite });
+            console.log('Updated "' + solutionField + '" field for ' + ticketKey + ' (mode: ' + outputType + ')');
         } catch (e) {
             console.error('Failed to update solution field "' + solutionField + '":', e);
             return { success: false, error: 'Solution field update failed: ' + e.toString() };
