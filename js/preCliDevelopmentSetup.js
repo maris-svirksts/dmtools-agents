@@ -91,8 +91,17 @@ function checkoutBranch(ticketKey, config) {
         }
 
         if (remoteBranches.trim()) {
-            console.log('Branch exists on remote, checking out and rebasing from main:', branchName);
-            runCmd({ command: 'git checkout -b ' + branchName + ' origin/' + branchName });
+            console.log('Branch exists on remote, fetching and checking out:', branchName);
+            // Explicitly fetch the branch so origin/<branch> tracking ref is available locally.
+            // git fetch origin --prune may not populate it if the repo is sparse/shallow.
+            try {
+                runCmd({ command: 'git fetch origin ' + branchName + ':' + branchName });
+                runCmd({ command: 'git checkout ' + branchName });
+            } catch (fetchCheckoutErr) {
+                console.warn('fetch+checkout failed, falling back to -b from origin:', fetchCheckoutErr);
+                runCmd({ command: 'git fetch origin ' + branchName });
+                runCmd({ command: 'git checkout -b ' + branchName + ' origin/' + branchName });
+            }
             try {
                 var rebaseOutput2 = cleanCommandOutput(
                     runCmd({ command: 'git rebase origin/' + config.git.baseBranch }) || ''
