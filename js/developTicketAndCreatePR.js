@@ -532,7 +532,7 @@ function action(params) {
         // Always use the expected branch (ai/<ticketKey>), computed from ticket key.
         // Do NOT trust git branch --show-current — the CLI agent may have switched branches.
         // Force checkout to the expected branch before committing to prevent pushing to develop/main.
-        const expectedBranch = configLoader.formatBranchName(config.git.branchPrefix.development, ticketKey);
+        // Note: expectedBranch is already declared above for the early-exit PR check — reuse it here.
 
         const rawBranchOutput = runCmd({ command: 'git branch --show-current' }) || '';
         const currentBranch = cleanCommandOutput(rawBranchOutput);
