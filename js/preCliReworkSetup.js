@@ -20,8 +20,14 @@ function action(params) {
 
         console.log('=== Rework setup for:', ticketKey, '===');
 
-        // Step 1: GitHub repo info
-        const repoInfo = gh.getGitHubRepoInfo();
+        // Step 1: GitHub repo info — prefer targetRepository from config over git remote
+        var repoInfo = null;
+        if (config.repository && config.repository.owner && config.repository.repo) {
+            repoInfo = { owner: config.repository.owner, repo: config.repository.repo };
+            console.log('Using targetRepository from config:', repoInfo.owner + '/' + repoInfo.repo);
+        } else {
+            repoInfo = gh.getGitHubRepoInfo();
+        }
         if (!repoInfo) {
             const err = 'Could not determine GitHub repository from git remote';
             try { jira_post_comment({ key: ticketKey, comment: 'h3. ❌ Rework Setup Failed\n\n' + err }); } catch (e) {}
@@ -48,7 +54,7 @@ function action(params) {
             return { success: false, error: 'Could not determine branch from PR details' };
         }
         try {
-            gh.checkoutPRBranch(branchName);
+            gh.checkoutPRBranch(branchName, config.workingDir);
         } catch (e) {
             return { success: false, error: 'Failed to checkout branch: ' + e.toString() };
         }
@@ -65,7 +71,7 @@ function action(params) {
         const headSha = prDetails.head ? prDetails.head.sha : null;
         const failedChecks = gh.detectFailedChecks(repoInfo.owner, repoInfo.repo, headSha, inputFolder);
 
-        const diff = gh.getPRDiff(baseBranch, branchName);
+        const diff = gh.getPRDiff(baseBranch, branchName, config.workingDir);
 
         console.log('Fetching PR discussions...');
         const discussionData = gh.fetchDiscussionsAndRawData(repoInfo.owner, repoInfo.repo, pr.number);

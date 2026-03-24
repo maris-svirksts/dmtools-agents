@@ -76,7 +76,11 @@ function configureGitAuthor(config) {
 }
 
 function commitAndPush(ticketKey, config) {
-    const rawBranch = cli_execute_command({ command: 'git branch --show-current' }) || '';
+    var workingDir = config.workingDir || null;
+    var cmdOpts = workingDir ? { workingDirectory: workingDir } : {};
+    var cmd = function(command) { return cli_execute_command(Object.assign({}, cmdOpts, { command: command })); };
+
+    const rawBranch = cmd('git branch --show-current') || '';
     const branchName = cleanCommandOutput(rawBranch);
 
     if (!branchName) {
@@ -84,33 +88,27 @@ function commitAndPush(ticketKey, config) {
     }
     console.log('Current branch:', branchName);
 
-    // Stage all changes
-    cli_execute_command({ command: 'git add .' });
+    cmd('git add .');
 
-    // Check for actual changes
-    const rawStatus = cli_execute_command({ command: 'git status --porcelain' }) || '';
+    const rawStatus = cmd('git status --porcelain') || '';
     const status = cleanCommandOutput(rawStatus);
 
     if (status.trim()) {
         const commitMsg = configLoader.formatTemplate(config.formats.commitMessage.rework, {ticketKey: ticketKey});
-        cli_execute_command({ command: 'git commit -m "' + commitMsg + '"' });
+        cmd('git commit -m "' + commitMsg + '"');
         console.log('✅ Committed rework changes');
     } else {
         console.warn('No file changes detected — pushing existing commits only');
     }
 
-    // Force push to existing PR branch
     try {
-        cli_execute_command({ command: 'git push -u origin ' + branchName });
+        cmd('git push -u origin ' + branchName);
     } catch (pushError) {
         console.log('Normal push failed, force pushing...');
-        cli_execute_command({ command: 'git push -u origin ' + branchName + ' --force' });
+        cmd('git push -u origin ' + branchName + ' --force');
     }
 
-    // Verify
-    const remoteCheck = cleanCommandOutput(
-        cli_execute_command({ command: 'git ls-remote --heads origin ' + branchName }) || ''
-    );
+    const remoteCheck = cleanCommandOutput(cmd('git ls-remote --heads origin ' + branchName) || '');
     if (!remoteCheck.trim()) {
         throw new Error('Branch was not successfully pushed to remote');
     }
@@ -253,8 +251,14 @@ function action(params) {
             return { success: false, error: gitError.toString() };
         }
 
-        // Find PR to post comment
-        const repoInfo = getGitHubRepoInfo();
+        // Find PR to post comment — prefer targetRepository from config over git remote
+        var repoInfo = null;
+        if (config.repository && config.repository.owner && config.repository.repo) {
+            repoInfo = { owner: config.repository.owner, repo: config.repository.repo };
+            console.log('Using targetRepository from config:', repoInfo.owner + '/' + repoInfo.repo);
+        } else {
+            repoInfo = getGitHubRepoInfo();
+        }
         const pr = repoInfo ? findPRForTicket(repoInfo.owner, repoInfo.repo, ticketKey) : null;
         let prCommentPosted = false;
 
