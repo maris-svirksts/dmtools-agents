@@ -67,9 +67,16 @@ function action(params) {
             if (outputType === 'append') {
                 var existing = '';
                 try {
-                    existing = jira_get_field({ key: ticketKey, field: solutionField }) || '';
-                    if (typeof existing === 'object') existing = JSON.stringify(existing);
-                    existing = existing.trim();
+                    var freshTicket = jira_get_ticket({ key: ticketKey, fields: [solutionField] });
+                    var freshFields = (freshTicket && freshTicket.fields) ? freshTicket.fields : freshTicket;
+                    var rawValue = freshFields ? freshFields[solutionField] : null;
+                    if (rawValue && typeof rawValue === 'object') {
+                        // ADF (Atlassian Document Format) — cannot be reliably converted to wiki markup.
+                        // Fall back to replace behavior to avoid corrupting the field.
+                        console.warn('Existing value of "' + solutionField + '" is in ADF format (Jira v3). Cannot merge with wiki markup — falling back to replace mode for this run.');
+                        rawValue = '';
+                    }
+                    existing = (rawValue || '').toString().trim();
                 } catch (e) {
                     console.warn('Could not read existing value of "' + solutionField + '", will append without prefix:', e);
                 }
