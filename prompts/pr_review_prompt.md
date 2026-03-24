@@ -81,10 +81,37 @@ Be thorough, constructive, and specific. Provide file paths and line numbers for
 
 You MUST write all three files below. Do NOT just write the review as plain text — the post-processing pipeline reads these files directly.
 
-### 1. `outputs/pr_review.json` — REQUIRED (exact format in `pr_review_json_output.md`)
+### 1. `outputs/pr_review.json` — REQUIRED
 This is the machine-readable result consumed by the post-action. If it is missing the entire review outcome is lost — the ticket will not be merged, no status will change, and no comments will be posted.
 
-**⚠️ CRITICAL — `recommendation` field**: Use EXACTLY `"APPROVE"`, `"REQUEST_CHANGES"`, or `"BLOCK"`. Never `"APPROVED"` (missing D). Never use `"verdict"` as the field name.
+**⚠️ CRITICAL — exact field names, wrong names = silent failure:**
+
+```json
+{
+  "recommendation": "APPROVE|REQUEST_CHANGES|BLOCK",
+  "generalComment": "outputs/pr_review_general.md",
+  "resolvedThreadIds": [],
+  "inlineComments": [
+    {
+      "path": "src/components/Button.tsx",
+      "line": 42,
+      "side": "RIGHT",
+      "body": "Write your comment text directly here in GitHub Markdown — do NOT use a file path",
+      "severity": "BLOCKING|IMPORTANT|SUGGESTION"
+    }
+  ],
+  "issueCounts": {
+    "blocking": 1,
+    "important": 0,
+    "suggestions": 2
+  }
+}
+```
+
+- **`recommendation`** — EXACTLY `"APPROVE"`, `"REQUEST_CHANGES"`, or `"BLOCK"`. Never `"APPROVED"`. Never `"verdict"`.
+- **`inlineComments[].path`** — relative file path (NOT `"file"`). **`inlineComments[].body`** — inline text (NOT `"comment"` file path). Wrong field names = comments silently not posted.
+- **`issueCounts`** — REQUIRED even if all zeros. Count every finding across ALL categories.
+- **`inlineComments`** — only lines that appear in the diff hunk. Lines outside the diff → GitHub API rejects with 422.
 
 ### 2. `outputs/pr_review_general.md` — REQUIRED
 GitHub-formatted general PR comment (referenced in `pr_review.json` → `generalComment`).
