@@ -217,17 +217,30 @@ function createPullRequest(title, branchName, baseBranch) {
         // Escape special characters in title
         const escapedTitle = title.replace(/"/g, '\\"').replace(/\n/g, ' ');
 
-        // Use outputs/response.md as body-file (must exist before calling this).
-        // When _workingDir is set (e.g. "dependencies/PostNL-commercial-mobileApp"),
-        // gh runs in that subdirectory, so we need to go up to reach the workspace root.
-        var bodyFilePath;
+        // Resolve --body-file path for gh pr create.
+        // gh runs in _workingDir (if set), so paths must be relative to it.
+        // We probe two locations (workspace root first, then workingDir itself)
+        // and use whichever exists.
+        var bodyFilePath = 'outputs/response.md'; // default: same dir as gh's CWD
         if (_workingDir) {
+            // Compute relative path from workingDir back to workspace root
             var depth = _workingDir.replace(/\/$/, '').split('/').length;
             var prefix = '';
             for (var i = 0; i < depth; i++) { prefix += '../'; }
-            bodyFilePath = prefix + 'outputs/response.md';
-        } else {
-            bodyFilePath = 'outputs/response.md';
+            var rootRelativePath = prefix + 'outputs/response.md';
+
+            // Probe workspace root via file_read (always resolves from workspace root)
+            var foundAtRoot = false;
+            try { file_read({ path: 'outputs/response.md' }); foundAtRoot = true; } catch (e) {}
+
+            if (foundAtRoot) {
+                bodyFilePath = rootRelativePath;
+                console.log('outputs/response.md found at workspace root, using:', bodyFilePath);
+            } else {
+                // Fall back: file may be inside workingDir itself
+                bodyFilePath = 'outputs/response.md';
+                console.log('outputs/response.md not at workspace root, trying workingDir-relative path:', bodyFilePath);
+            }
         }
 
         console.log('Using PR body file:', bodyFilePath);
