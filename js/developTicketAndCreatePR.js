@@ -529,17 +529,35 @@ function action(params) {
             };
         }
 
-        // Branch was already checked out by preCliJSAction — read current branch
-        const rawBranchOutput = runCmd({ command: 'git branch --show-current' }) || '';
-        const branchName = cleanCommandOutput(rawBranchOutput);
+        // Always use the expected branch (ai/<ticketKey>), computed from ticket key.
+        // Do NOT trust git branch --show-current — the CLI agent may have switched branches.
+        // Force checkout to the expected branch before committing to prevent pushing to develop/main.
+        const expectedBranch = configLoader.formatBranchName(config.git.branchPrefix.development, ticketKey);
 
-        if (!branchName) {
-            const error = 'Could not determine current git branch';
-            console.error('Raw git branch output:', rawBranchOutput);
-            postErrorCommentToJira(ticketKey, 'Git Configuration', error);
-            return { success: false, error: error };
+        const rawBranchOutput = runCmd({ command: 'git branch --show-current' }) || '';
+        const currentBranch = cleanCommandOutput(rawBranchOutput);
+        console.log('Current branch in workingDir:', currentBranch);
+
+        var branchName = expectedBranch;
+        if (currentBranch !== expectedBranch) {
+            console.warn('⚠️  Branch mismatch: expected "' + expectedBranch + '" but found "' + currentBranch + '". Forcing checkout to expected branch.');
+            try {
+                // Try to checkout expected branch (should already exist from preCliJSAction)
+                runCmd({ command: 'git checkout ' + expectedBranch });
+                console.log('✅ Switched to expected branch:', expectedBranch);
+            } catch (checkoutErr) {
+                console.warn('Expected branch not found, creating it:', checkoutErr);
+                try {
+                    runCmd({ command: 'git checkout -b ' + expectedBranch });
+                    console.log('✅ Created and switched to branch:', expectedBranch);
+                } catch (createErr) {
+                    const error = 'Could not checkout expected branch "' + expectedBranch + '": ' + createErr;
+                    postErrorCommentToJira(ticketKey, 'Git Branch Checkout', error);
+                    return { success: false, error: error };
+                }
+            }
         }
-        console.log('Using current branch:', branchName);
+        console.log('Using branch:', branchName);
 
         // Prepare commit message
         const commitMessage = configLoader.formatTemplate(config.formats.commitMessage.development, {ticketKey: ticketKey, ticketSummary: ticketSummary});
