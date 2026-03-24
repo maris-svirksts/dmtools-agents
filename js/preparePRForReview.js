@@ -17,8 +17,14 @@ function action(params) {
 
         console.log('=== Preparing PR for review:', ticketKey, '===');
 
-        // Step 1: GitHub repo info
-        const repoInfo = gh.getGitHubRepoInfo();
+        // Step 1: GitHub repo info — prefer targetRepository from config over git remote
+        var repoInfo = null;
+        if (config.repository && config.repository.owner && config.repository.repo) {
+            repoInfo = { owner: config.repository.owner, repo: config.repository.repo };
+            console.log('Using targetRepository from config:', repoInfo.owner + '/' + repoInfo.repo);
+        } else {
+            repoInfo = gh.getGitHubRepoInfo();
+        }
         if (!repoInfo) {
             const err = 'Could not determine GitHub repository from git remote';
             try { jira_post_comment({ key: ticketKey, comment: 'h3. ⚠️ PR Review Setup Failed\n\n' + err + '\n\n_Review cancelled — no PR to review._' }); } catch (e) {}

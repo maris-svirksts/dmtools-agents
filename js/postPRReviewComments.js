@@ -352,6 +352,8 @@ function action(params) {
     try {
         const ticketKey = params.ticket.key;
         const jiraReview = params.response || '';
+        var configLoader = require('./configLoader.js');
+        var config = configLoader.loadProjectConfig(params.jobParams || params);
 
         console.log('=== Processing PR review results for', ticketKey, '===');
 
@@ -372,8 +374,14 @@ function action(params) {
         let prNumber = null;
         let prUrl = null;
 
-        // Try to get repo info first as it's needed for finding PR
-        const repoInfo = getGitHubRepoInfo();
+        // Try to get repo info — prefer targetRepository from config over git remote
+        var repoInfo = null;
+        if (config.repository && config.repository.owner && config.repository.repo) {
+            repoInfo = { owner: config.repository.owner, repo: config.repository.repo };
+            console.log('Using targetRepository from config:', repoInfo.owner + '/' + repoInfo.repo);
+        } else {
+            repoInfo = getGitHubRepoInfo();
+        }
         if (!repoInfo) {
             console.warn('Could not get GitHub repo info - skipping GitHub comments');
         }
