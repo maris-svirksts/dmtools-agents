@@ -372,3 +372,89 @@ suite('configLoader.loadProjectConfig — featureBranchEnabled', function() {
     });
 
 });
+
+// ── .dmtools/branchNaming/sf_naming.js ───────────────────────────────────────
+
+suite('sf_naming.js', function() {
+
+    // Load the actual file via loadModule so it runs through the same
+    // new Function() path as loadConfigFile (GraalJS-safe).
+    var sfNaming = loadModule(
+        '.dmtools/branchNaming/sf_naming.js',
+        makeRequire({})
+    );
+
+    function ticket(key, summary) {
+        return { key: key, fields: { summary: summary || '' } };
+    }
+
+    test('module.exports is a function (loadConfigFile pattern works)', function() {
+        assert.equal(typeof sfNaming, 'function');
+    });
+
+    test('development role: feature/ft_ai_sfct_1206_fix_field_subject_task', function() {
+        var t = ticket('SFCT-1206', 'Fix field subject task object restricted picklist translations');
+        assert.equal(sfNaming(t, 'development'),
+            'feature/ft_ai_sfct_1206_fix_field_subject_task_object_restricted_picklist_translatio');
+    });
+
+    test('feature role: release/rc_ai_sfct_1206_...', function() {
+        var t = ticket('SFCT-1206', 'Fix field subject task object restricted picklist translations');
+        assert.equal(sfNaming(t, 'feature'),
+            'release/rc_ai_sfct_1206_fix_field_subject_task_object_restricted_picklist_translatio');
+    });
+
+    test('key lowercase: SFCT-1206 → sfct_1206', function() {
+        var t = ticket('SFCT-1206', 'Simple fix');
+        assert.contains(sfNaming(t, 'development'), 'sfct_1206');
+    });
+
+    test('special chars stripped from summary: apostrophe, brackets, dots', function() {
+        var t = ticket('SFCT-10', "Fix 'account' (B2B) email: don't break it.");
+        var result = sfNaming(t, 'development');
+        assert.notContains(result, "'");
+        assert.notContains(result, '(');
+        assert.notContains(result, ')');
+        assert.notContains(result, ':');
+        assert.notContains(result, '.');
+    });
+
+    test('no double underscores in result', function() {
+        var t = ticket('SFCT-99', 'Fix   (lots)   of   spaces!!');
+        var result = sfNaming(t, 'development');
+        assert.notContains(result, '__');
+    });
+
+    test('no trailing underscores', function() {
+        var t = ticket('SFCT-5', 'Summary ending with special!!');
+        var result = sfNaming(t, 'development');
+        assert.notContains(result, '_/');
+        assert.notEqual(result.charAt(result.length - 1), '_');
+    });
+
+    test('slug max 60 chars (full branch can be longer due to prefix)', function() {
+        var long = 'This is a very long summary that exceeds sixty characters easily when written out';
+        var t = ticket('SFCT-1', long);
+        var result = sfNaming(t, 'development');
+        var prefix = 'feature/ft_ai_sfct_1_';
+        var slug = result.substring(prefix.length);
+        assert.ok(slug.length <= 60, 'slug length ' + slug.length + ' exceeds 60');
+    });
+
+    test('empty summary produces no suffix', function() {
+        var t = ticket('BICE-42', '');
+        assert.equal(sfNaming(t, 'development'), 'feature/ft_ai_bice_42');
+    });
+
+    test('BICE project key', function() {
+        var t = ticket('BICE-131', 'Add mail collection appointments');
+        assert.equal(sfNaming(t, 'development'),
+            'feature/ft_ai_bice_131_add_mail_collection_appointments');
+    });
+
+    test('test role', function() {
+        var t = ticket('SFCT-7', 'Some test');
+        assert.equal(sfNaming(t, 'test'), 'test/sfct_7_some_test');
+    });
+
+});
