@@ -315,3 +315,60 @@ suite('configLoader.loadProjectConfig — branchNamingFnPath', function() {
     });
 
 });
+
+// ── customParams.featureBranchEnabled ─────────────────────────────────────────
+
+suite('configLoader.loadProjectConfig — featureBranchEnabled', function() {
+
+    function makeLoader() {
+        var fakeFileRead = function() { return null; };
+        return loadModule(
+            'agents/js/configLoader.js',
+            makeRequire({ './config.js': configModule, 'config': configModule }),
+            { file_read: fakeFileRead }
+        );
+    }
+
+    test('featureBranchEnabled=true enables two-branch flow', function() {
+        var loader = makeLoader();
+        var config = loader.loadProjectConfig({ customParams: { featureBranchEnabled: true } });
+        assert.equal(config.git.featureBranch.enabled, true);
+    });
+
+    test('featureBranchEnabled absent leaves featureBranch disabled by default', function() {
+        var loader = makeLoader();
+        var config = loader.loadProjectConfig({ customParams: {} });
+        assert.equal(config.git.featureBranch.enabled, false);
+    });
+
+    test('featureBranchEnabled=false does not enable two-branch flow', function() {
+        var loader = makeLoader();
+        var config = loader.loadProjectConfig({ customParams: { featureBranchEnabled: false } });
+        assert.equal(config.git.featureBranch.enabled, false);
+    });
+
+    test('featureBranchEnabled combined with branchNamingFnPath routes PR to feature branch', function() {
+        var fnSrc = 'module.exports = function(ticket, role) {' +
+            '  return role === "feature" ? "Feature/ft_ai_" + ticket.key : "ai/" + ticket.key;' +
+            '};';
+        var fakeFileRead = function(p) {
+            var path = typeof p === 'string' ? p : p.path;
+            return path === 'agents/js/branchNaming/sf_naming.js' ? fnSrc : null;
+        };
+        var loader = loadModule(
+            'agents/js/configLoader.js',
+            makeRequire({ './config.js': configModule, 'config': configModule }),
+            { file_read: fakeFileRead }
+        );
+        var config = loader.loadProjectConfig({
+            customParams: {
+                featureBranchEnabled: true,
+                branchNamingFnPath: 'agents/js/branchNaming/sf_naming.js'
+            }
+        });
+        var ticket = { key: 'SFCT-123', fields: {} };
+        assert.equal(loader.resolveBranchName(config, ticket, 'development'), 'ai/SFCT-123');
+        assert.equal(loader.resolvePRTargetBranch(config, ticket), 'Feature/ft_ai_SFCT-123');
+    });
+
+});

@@ -311,6 +311,14 @@ function loadProjectConfig(params) {
         }
     }
 
+    // Allow individual agents to enable two-branch flow via customParams.featureBranchEnabled,
+    // without requiring a project-wide config.git.featureBranch.enabled change.
+    if (customParams.featureBranchEnabled === true) {
+        config.git.featureBranch = config.git.featureBranch || {};
+        config.git.featureBranch.enabled = true;
+        console.log('configLoader: Two-branch flow enabled via customParams.featureBranchEnabled');
+    }
+
     return config;
 }
 
