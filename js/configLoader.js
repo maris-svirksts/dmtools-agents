@@ -47,6 +47,10 @@ var DEFAULTS = {
             development: 'ai',
             feature: DEFAULT_CONFIG.GIT_CONFIG.DEFAULT_ISSUE_TYPE_PREFIX,
             test: 'test'
+        },
+        branchNamingFn: null,   // function(ticket, branchRole) → string; overrides prefix-based naming
+        featureBranch: {
+            enabled: false       // two-branch flow: dev branch → feature branch PR (not → baseBranch)
         }
     },
 
@@ -338,6 +342,42 @@ function formatBranchName(prefix, ticketKey) {
     return prefix + '/' + ticketKey;
 }
 
+/**
+ * Resolve the working branch name for a ticket and role ('development', 'feature', 'test').
+ * If config.git.branchNamingFn is set, delegates to it.
+ * Otherwise falls back to formatBranchName(config.git.branchPrefix[branchRole], ticket.key).
+ *
+ * @param {Object} config     - Merged project config from loadProjectConfig()
+ * @param {Object} ticket     - Jira ticket object ({ key, fields: { issuetype: { name } } })
+ * @param {string} branchRole - 'development' | 'feature' | 'test'
+ * @returns {string} Branch name
+ */
+function resolveBranchName(config, ticket, branchRole) {
+    if (config.git.branchNamingFn && typeof config.git.branchNamingFn === 'function') {
+        return config.git.branchNamingFn(ticket, branchRole);
+    }
+    var prefix = (config.git.branchPrefix && config.git.branchPrefix[branchRole])
+              || config.git.branchPrefix.development;
+    return formatBranchName(prefix, ticket.key);
+}
+
+/**
+ * Resolve the PR target branch.
+ * In two-branch mode (config.git.featureBranch.enabled = true):
+ *   returns the feature branch name (resolveBranchName for 'feature' role).
+ * Otherwise: returns config.git.baseBranch.
+ *
+ * @param {Object} config  - Merged project config
+ * @param {Object} ticket  - Jira ticket object
+ * @returns {string} Branch to open PR against
+ */
+function resolvePRTargetBranch(config, ticket) {
+    if (config.git.featureBranch && config.git.featureBranch.enabled) {
+        return resolveBranchName(config, ticket, 'feature');
+    }
+    return config.git.baseBranch;
+}
+
 // ── Confluence URL resolution ────────────────────────────────────────────────
 
 /**
@@ -405,6 +445,8 @@ module.exports = {
     formatTemplate: formatTemplate,
     interpolateJql: interpolateJql,
     formatBranchName: formatBranchName,
+    resolveBranchName: resolveBranchName,
+    resolvePRTargetBranch: resolvePRTargetBranch,
     resolveConfluenceUrls: resolveConfluenceUrls,
     resolveInstructions: resolveInstructions
 };

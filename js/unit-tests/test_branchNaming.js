@@ -1,0 +1,238 @@
+/**
+ * Unit tests for branch naming extensions in agents/js/configLoader.js
+ *
+ * Tests: resolveBranchName, resolvePRTargetBranch, mergeProjectConfig (branch fields)
+ *
+ * Uses: configLoaderModule (pre-loaded by testRunner), suite(), test(), assert
+ */
+
+// ── resolveBranchName ─────────────────────────────────────────────────────────
+
+suite('configLoader.resolveBranchName', function() {
+
+    test('uses development prefix when no branchNamingFn', function() {
+        var config = configLoaderModule.mergeProjectConfig(configLoaderModule.DEFAULTS, {});
+        var ticket = { key: 'PROJ-42', fields: {} };
+        assert.equal(configLoaderModule.resolveBranchName(config, ticket, 'development'), 'ai/PROJ-42');
+    });
+
+    test('uses feature prefix for feature role', function() {
+        var config = configLoaderModule.mergeProjectConfig(configLoaderModule.DEFAULTS, {});
+        var ticket = { key: 'PROJ-42', fields: {} };
+        var result = configLoaderModule.resolveBranchName(config, ticket, 'feature');
+        // feature prefix comes from DEFAULT_CONFIG.GIT_CONFIG.DEFAULT_ISSUE_TYPE_PREFIX
+        assert.ok(result.indexOf('PROJ-42') !== -1, 'Branch name should contain ticket key');
+        assert.ok(result.indexOf('/') !== -1, 'Branch name should contain prefix separator');
+    });
+
+    test('uses test prefix for test role', function() {
+        var config = configLoaderModule.mergeProjectConfig(configLoaderModule.DEFAULTS, {});
+        var ticket = { key: 'PROJ-42', fields: {} };
+        assert.equal(configLoaderModule.resolveBranchName(config, ticket, 'test'), 'test/PROJ-42');
+    });
+
+    test('falls back to development prefix for unknown role', function() {
+        var config = configLoaderModule.mergeProjectConfig(configLoaderModule.DEFAULTS, {});
+        var ticket = { key: 'PROJ-42', fields: {} };
+        assert.equal(configLoaderModule.resolveBranchName(config, ticket, 'unknown'), 'ai/PROJ-42');
+    });
+
+    test('calls branchNamingFn when set (development role)', function() {
+        var called = false;
+        var namingFn = function(ticket, branchRole) {
+            called = true;
+            return 'custom/' + ticket.key;
+        };
+        var config = configLoaderModule.mergeProjectConfig(configLoaderModule.DEFAULTS, {
+            git: { branchNamingFn: namingFn }
+        });
+        var ticket = { key: 'PROJ-42', fields: {} };
+        var result = configLoaderModule.resolveBranchName(config, ticket, 'development');
+        assert.ok(called, 'branchNamingFn should have been called');
+        assert.equal(result, 'custom/PROJ-42');
+    });
+
+    test('branchNamingFn receives ticket and branchRole args', function() {
+        var receivedTicket = null;
+        var receivedRole = null;
+        var namingFn = function(ticket, branchRole) {
+            receivedTicket = ticket;
+            receivedRole = branchRole;
+            return 'x/' + ticket.key;
+        };
+        var config = configLoaderModule.mergeProjectConfig(configLoaderModule.DEFAULTS, {
+            git: { branchNamingFn: namingFn }
+        });
+        var ticket = { key: 'PROJ-99', fields: { issuetype: { name: 'Story' } } };
+        configLoaderModule.resolveBranchName(config, ticket, 'feature');
+        assert.equal(receivedTicket, ticket);
+        assert.equal(receivedRole, 'feature');
+    });
+
+    test('branchNamingFn for MAPC-style issue-type naming: bug/MAPC-123', function() {
+        var mapcNamingFn = function(ticket, branchRole) {
+            var issueType = (ticket.fields && ticket.fields.issuetype && ticket.fields.issuetype.name || 'feature').toLowerCase();
+            return issueType + '/' + ticket.key;
+        };
+        var config = configLoaderModule.mergeProjectConfig(configLoaderModule.DEFAULTS, {
+            git: { branchNamingFn: mapcNamingFn }
+        });
+        var ticket = { key: 'MAPC-123', fields: { issuetype: { name: 'Bug' } } };
+        assert.equal(configLoaderModule.resolveBranchName(config, ticket, 'development'), 'bug/MAPC-123');
+    });
+
+    test('branchNamingFn for MAPC-style issue-type naming: story/STORY-456', function() {
+        var mapcNamingFn = function(ticket, branchRole) {
+            var issueType = (ticket.fields && ticket.fields.issuetype && ticket.fields.issuetype.name || 'feature').toLowerCase();
+            return issueType + '/' + ticket.key;
+        };
+        var config = configLoaderModule.mergeProjectConfig(configLoaderModule.DEFAULTS, {
+            git: { branchNamingFn: mapcNamingFn }
+        });
+        var ticket = { key: 'STORY-456', fields: { issuetype: { name: 'Story' } } };
+        assert.equal(configLoaderModule.resolveBranchName(config, ticket, 'development'), 'story/STORY-456');
+    });
+
+    test('branchNamingFn for MAPC-style issue-type naming: subtask → task/PROJ-1', function() {
+        var mapcNamingFn = function(ticket, branchRole) {
+            var rawType = (ticket.fields && ticket.fields.issuetype && ticket.fields.issuetype.name || 'feature').toLowerCase();
+            var issueType = rawType === 'subtask' ? 'task' : rawType;
+            return issueType + '/' + ticket.key;
+        };
+        var config = configLoaderModule.mergeProjectConfig(configLoaderModule.DEFAULTS, {
+            git: { branchNamingFn: mapcNamingFn }
+        });
+        var ticket = { key: 'PROJ-1', fields: { issuetype: { name: 'Subtask' } } };
+        assert.equal(configLoaderModule.resolveBranchName(config, ticket, 'development'), 'task/PROJ-1');
+    });
+
+    test('branchNamingFn fallback when ticket has no issuetype', function() {
+        var mapcNamingFn = function(ticket, branchRole) {
+            var issueType = (ticket.fields && ticket.fields.issuetype && ticket.fields.issuetype.name || 'feature').toLowerCase();
+            return issueType + '/' + ticket.key;
+        };
+        var config = configLoaderModule.mergeProjectConfig(configLoaderModule.DEFAULTS, {
+            git: { branchNamingFn: mapcNamingFn }
+        });
+        var ticket = { key: 'PROJ-7', fields: {} };
+        assert.equal(configLoaderModule.resolveBranchName(config, ticket, 'development'), 'feature/PROJ-7');
+    });
+
+});
+
+// ── resolvePRTargetBranch ─────────────────────────────────────────────────────
+
+suite('configLoader.resolvePRTargetBranch', function() {
+
+    test('returns baseBranch when featureBranch disabled (default)', function() {
+        var config = configLoaderModule.mergeProjectConfig(configLoaderModule.DEFAULTS, {});
+        var ticket = { key: 'PROJ-10', fields: {} };
+        assert.equal(configLoaderModule.resolvePRTargetBranch(config, ticket), config.git.baseBranch);
+    });
+
+    test('returns baseBranch when featureBranch not configured at all', function() {
+        var config = configLoaderModule.mergeProjectConfig(configLoaderModule.DEFAULTS, {
+            git: { baseBranch: 'develop' }
+        });
+        var ticket = { key: 'PROJ-10', fields: {} };
+        assert.equal(configLoaderModule.resolvePRTargetBranch(config, ticket), 'develop');
+    });
+
+    test('returns feature branch name when featureBranch.enabled = true', function() {
+        var config = configLoaderModule.mergeProjectConfig(configLoaderModule.DEFAULTS, {
+            git: { featureBranch: { enabled: true } }
+        });
+        var ticket = { key: 'PROJ-99', fields: {} };
+        // feature prefix default is the DEFAULT_ISSUE_TYPE_PREFIX from config.js
+        var result = configLoaderModule.resolvePRTargetBranch(config, ticket);
+        assert.ok(result.indexOf('PROJ-99') !== -1, 'Feature branch should contain ticket key: ' + result);
+        assert.notEqual(result, config.git.baseBranch, 'Should not return baseBranch');
+    });
+
+    test('feature branch name uses prefix strategy when no branchNamingFn', function() {
+        var config = configLoaderModule.mergeProjectConfig(configLoaderModule.DEFAULTS, {
+            git: {
+                featureBranch: { enabled: true },
+                branchPrefix: { development: 'ai', feature: 'feature', test: 'test' }
+            }
+        });
+        var ticket = { key: 'PROJ-99', fields: {} };
+        assert.equal(configLoaderModule.resolvePRTargetBranch(config, ticket), 'feature/PROJ-99');
+    });
+
+    test('feature branch name uses branchNamingFn when set', function() {
+        var namingFn = function(ticket, branchRole) {
+            return branchRole + '-' + ticket.key;
+        };
+        var config = configLoaderModule.mergeProjectConfig(configLoaderModule.DEFAULTS, {
+            git: {
+                featureBranch: { enabled: true },
+                branchNamingFn: namingFn
+            }
+        });
+        var ticket = { key: 'PROJ-5', fields: {} };
+        assert.equal(configLoaderModule.resolvePRTargetBranch(config, ticket), 'feature-PROJ-5');
+    });
+
+    test('two-branch mode with MAPC-style naming', function() {
+        var mapcNamingFn = function(ticket, branchRole) {
+            var issueType = (ticket.fields && ticket.fields.issuetype && ticket.fields.issuetype.name || 'feature').toLowerCase();
+            if (branchRole === 'feature') return issueType + '/' + ticket.key;
+            return 'ai/' + ticket.key;
+        };
+        var config = configLoaderModule.mergeProjectConfig(configLoaderModule.DEFAULTS, {
+            git: {
+                featureBranch: { enabled: true },
+                branchNamingFn: mapcNamingFn
+            }
+        });
+        var ticket = { key: 'MAPC-55', fields: { issuetype: { name: 'Story' } } };
+        assert.equal(configLoaderModule.resolvePRTargetBranch(config, ticket), 'story/MAPC-55');
+    });
+
+});
+
+// ── mergeProjectConfig — branch fields ────────────────────────────────────────
+
+suite('configLoader.mergeProjectConfig — branch fields', function() {
+
+    test('featureBranch.enabled survives merge', function() {
+        var config = configLoaderModule.mergeProjectConfig(configLoaderModule.DEFAULTS, {
+            git: { featureBranch: { enabled: true } }
+        });
+        assert.equal(config.git.featureBranch.enabled, true);
+    });
+
+    test('branchNamingFn function survives deepMerge (not converted to object)', function() {
+        var fn = function(ticket, role) { return 'x/' + ticket.key; };
+        var config = configLoaderModule.mergeProjectConfig(configLoaderModule.DEFAULTS, {
+            git: { branchNamingFn: fn }
+        });
+        assert.equal(typeof config.git.branchNamingFn, 'function');
+        assert.equal(config.git.branchNamingFn, fn);
+    });
+
+    test('featureBranch deep-merges with defaults (enabled overrides, others inherit)', function() {
+        var config = configLoaderModule.mergeProjectConfig(configLoaderModule.DEFAULTS, {
+            git: { featureBranch: { enabled: true } }
+        });
+        assert.equal(config.git.featureBranch.enabled, true);
+        // baseBranch and other git fields should still be present
+        assert.ok(config.git.baseBranch, 'baseBranch should be present after merge');
+    });
+
+    test('branchPrefix overrides work alongside featureBranch', function() {
+        var config = configLoaderModule.mergeProjectConfig(configLoaderModule.DEFAULTS, {
+            git: {
+                branchPrefix: { development: 'dev', feature: 'feat', test: 'qa' },
+                featureBranch: { enabled: true }
+            }
+        });
+        var ticket = { key: 'T-1', fields: {} };
+        assert.equal(configLoaderModule.resolveBranchName(config, ticket, 'development'), 'dev/T-1');
+        assert.equal(configLoaderModule.resolveBranchName(config, ticket, 'feature'), 'feat/T-1');
+        assert.equal(configLoaderModule.resolveBranchName(config, ticket, 'test'), 'qa/T-1');
+        assert.equal(configLoaderModule.resolvePRTargetBranch(config, ticket), 'feat/T-1');
+    });
+
+});

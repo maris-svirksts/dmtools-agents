@@ -40,9 +40,11 @@ function cleanCommandOutput(output) {
     return lines.join('\n').trim();
 }
 
-function checkoutBranch(ticketKey, config) {
+function checkoutBranch(ticketKey, config, ticket) {
+    ticket = ticket || { key: ticketKey, fields: {} };
     _workingDir = config.workingDir || null;
-    var branchName = configLoader.formatBranchName(config.git.branchPrefix.development, ticketKey);
+    var branchName = configLoader.resolveBranchName(config, ticket, 'development');
+    var rebaseBase = configLoader.resolvePRTargetBranch(config, ticket);
     console.log('Setting up branch:', branchName);
 
     try {
@@ -71,7 +73,7 @@ function checkoutBranch(ticketKey, config) {
         runCmd({ command: 'git checkout ' + branchName });
         try {
             var rebaseOutput = cleanCommandOutput(
-                runCmd({ command: 'git rebase origin/' + config.git.baseBranch }) || ''
+                runCmd({ command: 'git rebase origin/' + rebaseBase }) || ''
             );
             if (rebaseOutput.indexOf('CONFLICT') !== -1) {
                 throw new Error('Rebase conflict detected: ' + rebaseOutput.substring(0, 200));
@@ -79,7 +81,7 @@ function checkoutBranch(ticketKey, config) {
         } catch (rebaseErr) {
             console.warn('Rebase failed, resetting to main:', rebaseErr);
             try { runCmd({ command: 'git rebase --abort' }); } catch (_) {}
-            runCmd({ command: 'git reset --hard origin/' + config.git.baseBranch });
+            runCmd({ command: 'git reset --hard origin/' + rebaseBase });
         }
     } else {
         var remoteBranches = '';
@@ -104,7 +106,7 @@ function checkoutBranch(ticketKey, config) {
             }
             try {
                 var rebaseOutput2 = cleanCommandOutput(
-                    runCmd({ command: 'git rebase origin/' + config.git.baseBranch }) || ''
+                    runCmd({ command: 'git rebase origin/' + rebaseBase }) || ''
                 );
                 if (rebaseOutput2.indexOf('CONFLICT') !== -1) {
                     throw new Error('Rebase conflict detected: ' + rebaseOutput2.substring(0, 200));
@@ -112,12 +114,38 @@ function checkoutBranch(ticketKey, config) {
             } catch (rebaseErr) {
                 console.warn('Rebase failed, resetting to main:', rebaseErr);
                 try { runCmd({ command: 'git rebase --abort' }); } catch (_) {}
-                runCmd({ command: 'git reset --hard origin/' + config.git.baseBranch });
+                runCmd({ command: 'git reset --hard origin/' + rebaseBase });
             }
         } else {
-            console.log('Creating new branch from', config.git.baseBranch + ':', branchName);
-            runCmd({ command: 'git checkout ' + config.git.baseBranch });
-            runCmd({ command: 'git pull origin ' + config.git.baseBranch });
+            // New branch: in two-branch mode, ensure feature branch exists first
+            var branchBase = config.git.baseBranch;
+            if (config.git.featureBranch && config.git.featureBranch.enabled) {
+                var featureBranchName = configLoader.resolveBranchName(config, ticket, 'feature');
+                var featureLocal = '';
+                try {
+                    featureLocal = cleanCommandOutput(runCmd({ command: 'git branch --list "' + featureBranchName + '"' }) || '');
+                } catch (e) {}
+                var featureRemote = '';
+                try {
+                    featureRemote = cleanCommandOutput(runCmd({ command: 'git ls-remote --heads origin ' + featureBranchName }) || '');
+                } catch (e) {}
+                if (!featureLocal.trim() && !featureRemote.trim()) {
+                    console.log('Two-branch mode: creating feature branch from', config.git.baseBranch + ':', featureBranchName);
+                    runCmd({ command: 'git checkout ' + config.git.baseBranch });
+                    runCmd({ command: 'git pull origin ' + config.git.baseBranch });
+                    runCmd({ command: 'git checkout -b ' + featureBranchName });
+                    runCmd({ command: 'git push -u origin ' + featureBranchName });
+                } else if (featureRemote.trim() && !featureLocal.trim()) {
+                    runCmd({ command: 'git checkout -b ' + featureBranchName + ' origin/' + featureBranchName });
+                } else {
+                    runCmd({ command: 'git checkout ' + featureBranchName });
+                }
+                branchBase = featureBranchName;
+                console.log('Two-branch mode: dev branch will be created from feature branch:', featureBranchName);
+            }
+            console.log('Creating new branch from', branchBase + ':', branchName);
+            runCmd({ command: 'git checkout ' + branchBase });
+            runCmd({ command: 'git pull origin ' + branchBase });
             runCmd({ command: 'git checkout -b ' + branchName });
         }
     }
@@ -146,7 +174,8 @@ function action(params) {
 
         // 2. Checkout or create feature branch
         try {
-            checkoutBranch(ticketKey, config);
+            var ticket = params.ticket || actualParams.ticket || { key: ticketKey, fields: {} };
+            checkoutBranch(ticketKey, config, ticket);
         } catch (e) {
             console.error('Branch checkout failed (non-fatal):', e);
         }

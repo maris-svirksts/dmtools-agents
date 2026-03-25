@@ -487,7 +487,7 @@ function action(params) {
         // ── Early exit: PR already open for this branch ──────────────────────
         // If a PR already exists, a previous run created it but failed to move
         // the ticket to In Review. Move now and skip re-development.
-        const expectedBranch = configLoader.formatBranchName(config.git.branchPrefix.development, ticketKey);
+        const expectedBranch = configLoader.resolveBranchName(config, params.ticket || actualParams.ticket, 'development');
         try {
             const existingPrJson = runCmd({
                 command: 'gh pr list --head ' + expectedBranch + ' --state open --json url,number --jq ".[0]"'
@@ -635,7 +635,8 @@ function action(params) {
 
         // Create Pull Request
         const prTitle = configLoader.formatTemplate(config.formats.prTitle.development, {ticketKey: ticketKey, ticketSummary: ticketSummary});
-        const prResult = createPullRequest(prTitle, branchName, config.git.baseBranch);
+        const prTarget = configLoader.resolvePRTargetBranch(config, params.ticket || actualParams.ticket);
+        const prResult = createPullRequest(prTitle, branchName, prTarget);
 
         if (!prResult.success) {
             postErrorCommentToJira(ticketKey, 'Pull Request Creation', prResult.error);
