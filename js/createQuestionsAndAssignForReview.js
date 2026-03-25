@@ -40,7 +40,12 @@ function readQuestionsJson() {
             return [];
         }
         var parsed = JSON.parse(raw);
+        // Handle both plain array [...] and wrapped {"questions": [...]} formats
         if (!Array.isArray(parsed)) {
+            if (parsed && Array.isArray(parsed.questions)) {
+                console.warn('outputs/questions.json was wrapped in {"questions":[...]} — using inner array. Agent should write a plain JSON array.');
+                return parsed.questions;
+            }
             console.warn('outputs/questions.json is not an array');
             return [];
         }
