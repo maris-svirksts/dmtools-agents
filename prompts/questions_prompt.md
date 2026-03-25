@@ -19,6 +19,31 @@ List the input folder with `ls -la input/MAPC-*/` (or the actual ticket folder) 
 - Use `||col1||col2||` for table headers, `|val1|val2|` for rows
 - Do NOT use triple backticks — use `{code}...{code}` or `{noformat}...{noformat}`
 
+**CRITICAL: Description files must NEVER contain a title line.**
+The `summary` field in `questions.json` becomes the Jira subtask title automatically. Writing a title inside the description file creates a duplicate heading visible in Jira.
+
+The MAPC Q Confluence template shows `Title: [Q] ...` — that value goes into the `summary` field of `questions.json`, NOT into the description `.md` file. The `.md` file starts directly with the body content.
+
+✅ CORRECT description file — starts directly with content:
+```
+h2. Background
+
+The story lists three candidate solutions for making customer number generation collision-free,
+but no preferred approach has been chosen yet.
+
+h2. Question
+
+Which of the three proposed solutions should be implemented?
+```
+
+❌ WRONG — do NOT add a title line at the top:
+```
+Title: [Q] Confirm uniqueness strategy for customer number generation
+
+h2. Background
+...
+```
+
 In addition to functional questions, always check:
 
 *Navigation & discoverability:* How will a user reach this feature? Is there a clear path from the app entry point (homepage / nav menu) to this screen or action? If the route is not obvious or not yet covered by another story, raise a question about it.
