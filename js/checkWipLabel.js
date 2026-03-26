@@ -16,6 +16,10 @@ function action(params) {
     try {
         const ticket = params.ticket;
         const metadata = params.metadata;
+
+        console.log('=== Running checkWipLabel pre-action ===');
+        console.log('Ticket key:', ticket && ticket.key ? ticket.key : '(missing)');
+        console.log('Context ID:', metadata && metadata.contextId ? metadata.contextId : '(missing)');
         
         if (!ticket || !metadata || !metadata.contextId) {
             console.log('No contextId in metadata, continuing with processing');
@@ -28,6 +32,8 @@ function action(params) {
         
         // Get ticket labels
         const labels = ticket.fields && ticket.fields.labels ? ticket.fields.labels : [];
+        console.log('Expected WIP label:', wipLabel);
+        console.log('Ticket labels:', labels.length > 0 ? labels.join(', ') : '(none)');
         
         // Check if WIP label exists
         if (labels.includes(wipLabel)) {
@@ -47,17 +53,19 @@ function action(params) {
                 console.warn('Failed to post skip comment:', commentError);
             }
             
+            console.log('checkWipLabel result: stop processing');
             return false; // Stop processing
         }
         
         console.log('✅ Ticket ' + ticketKey + ' does not have WIP label "' + wipLabel + '" - continuing with processing');
+        console.log('checkWipLabel result: continue processing');
         return true; // Continue processing
         
     } catch (error) {
         console.error('❌ Error in WIP label check:', error);
         // On error, continue processing to avoid blocking legitimate workflows
         console.warn('Continuing with processing despite error in WIP check');
+        console.log('checkWipLabel result: continue processing after error');
         return true;
     }
 }
-
