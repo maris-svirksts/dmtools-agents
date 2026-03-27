@@ -134,3 +134,5 @@ Jira-formatted review summary posted as a ticket comment.
 - Count of blocking / important / suggestion findings
 - PR link
 - One sentence on the most critical issue (if any)
+
+**CRITICAL IMPORTANT** YOU MUST CHECK IF THE PULL REQUEST DOES EXACTLY WHAT IS ASKED IN TICKET. If there are changes in business logic which are not expected, you must flag it.
