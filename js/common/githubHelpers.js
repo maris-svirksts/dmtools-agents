@@ -121,6 +121,14 @@ function getPRDiff(baseBranch, headBranch, workingDir) {
     try {
         console.log('Generating diff between', baseBranch, 'and', headBranch, workingDir ? '(in ' + workingDir + ')' : '');
 
+        // Unshallow if needed so there is a full merge base available
+        try {
+            cmd('git fetch --unshallow');
+            console.log('Unshallowed repository for full merge base detection');
+        } catch (e) {
+            // Already a complete repo — harmless, continue
+        }
+
         // First try three-dot diff (shows only changes on headBranch since divergence)
         try {
             const diff = cmd('git diff ' + baseBranch + '...' + headBranch) || '';
