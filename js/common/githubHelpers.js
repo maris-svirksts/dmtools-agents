@@ -124,10 +124,15 @@ function getPRDiff(baseBranch, headBranch, workingDir) {
 
         // Unshallow if needed so there is a full merge base available
         try {
-            cmd('git fetch --unshallow');
-            console.log('Unshallowed repository for full merge base detection');
+            var isShallow = cleanCommandOutput(cmd('git rev-parse --is-shallow-repository') || 'false');
+            if (isShallow.trim() === 'true') {
+                cmd('git fetch --unshallow');
+                console.log('Unshallowed repository for full merge base detection');
+            } else {
+                console.log('Repository is already complete (not shallow), skipping unshallow');
+            }
         } catch (e) {
-            // Already a complete repo — harmless, continue
+            // ignore — already complete or unshallow not supported
         }
 
         // First try three-dot diff (shows only changes on headBranch since divergence)
@@ -370,10 +375,13 @@ function detectMergeConflicts(baseBranch, inputFolder, workingDir) {
         console.log('Checking for merge conflicts with origin/' + baseBranch + (workingDir ? ' in ' + workingDir : '') + '...');
 
         try {
-            cmd('git fetch --unshallow');
-            console.log('Unshallowed repository for full merge base detection');
+            var isShallow = cleanCommandOutput(cmd('git rev-parse --is-shallow-repository') || 'false');
+            if (isShallow.trim() === 'true') {
+                cmd('git fetch --unshallow');
+                console.log('Unshallowed repository for full merge base detection');
+            }
         } catch (e) {
-            // Already a complete repo — harmless, continue
+            // ignore — already complete or unshallow not supported
         }
 
         cmd('git merge origin/' + baseBranch + ' --no-commit --no-ff');
