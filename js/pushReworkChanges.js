@@ -171,22 +171,40 @@ function postThreadReplies(workspace, repository, pullRequestId) {
 
     let posted = 0;
     replies.forEach(function(item) {
-        // Reply to the thread
-        try {
-            github_reply_to_pr_thread({
-                workspace: workspace,
-                repository: repository,
-                pullRequestId: String(pullRequestId),
-                inReplyToId: String(item.inReplyToId),
-                text: item.reply || '✅ Addressed.'
-            });
-            console.log('✅ Replied to comment #' + item.inReplyToId);
-            posted++;
-        } catch (e) {
-            console.warn('Failed to reply to comment #' + item.inReplyToId + ':', e.message || e);
+        const replyText = item.reply || '✅ Addressed.';
+
+        if (item.inReplyToId) {
+            // Inline thread reply — post inside the thread
+            try {
+                github_reply_to_pr_thread({
+                    workspace: workspace,
+                    repository: repository,
+                    pullRequestId: String(pullRequestId),
+                    inReplyToId: String(item.inReplyToId),
+                    text: replyText
+                });
+                console.log('✅ Replied to comment #' + item.inReplyToId);
+                posted++;
+            } catch (e) {
+                console.warn('Failed to reply to comment #' + item.inReplyToId + ':', e.message || e);
+            }
+        } else {
+            // General PR comment (no thread ID) — post as top-level PR comment
+            try {
+                github_add_pr_comment({
+                    workspace: workspace,
+                    repository: repository,
+                    pullRequestId: String(pullRequestId),
+                    text: replyText
+                });
+                console.log('✅ Posted general reply (no threadId)');
+                posted++;
+            } catch (e) {
+                console.warn('Failed to post general reply:', e.message || e);
+            }
         }
 
-        // Resolve the thread
+        // Resolve the thread (only if we have a threadId)
         if (item.threadId) {
             try {
                 github_resolve_pr_thread({
