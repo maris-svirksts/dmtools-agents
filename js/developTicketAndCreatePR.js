@@ -8,6 +8,27 @@ const { extractTicketKey } = require('./common/jiraHelpers.js');
 var configLoader = require('./configLoader.js');
 const { GIT_CONFIG, STATUSES, LABELS } = require('./config.js');
 
+function deriveProjectKey(customParams) {
+    if (!customParams) return '';
+    if (customParams.projectKey) return customParams.projectKey;
+    var cp = customParams.configPath || '';
+    if (!cp) return '';
+    var base = cp.substring(cp.lastIndexOf('/') + 1).replace(/\.js$/, '');
+    return (base && base !== 'config') ? base : '';
+}
+
+function buildAutoStartEncodedConfig(ticketKey, customParams) {
+    var p = { inputJql: 'key = ' + ticketKey };
+    var cp = customParams && customParams.configPath;
+    if (cp) { p.customParams = { configPath: cp }; }
+    return encodeURIComponent(JSON.stringify({ params: p }));
+}
+
+function hasPrApprovedLabel(ticket) {
+    var labels = (ticket && ticket.fields && ticket.fields.labels) ? ticket.fields.labels : [];
+    return labels.indexOf(LABELS.PR_APPROVED) !== -1;
+}
+
 // Universal working-directory-aware wrapper for cli_execute_command.
 // When config.workingDir is set (via customParams.targetRepository.workingDir),
 // all git/shell commands are executed inside that directory.
@@ -701,6 +722,41 @@ function action(params) {
         }
 
         console.log('✅ Development workflow completed successfully');
+
+        // Auto-start pr_review after PR is created and ticket moved to In Review (opt-in)
+        const customParams = actualParams && actualParams.customParams;
+        const autoStartReview = customParams && customParams.autoStartReview;
+        const reviewConfigFile = customParams && customParams.autoStartReviewConfigFile;
+        if (autoStartReview && reviewConfigFile) {
+            if (hasPrApprovedLabel(actualParams.ticket)) {
+                console.log('ℹ️ autoStartReview: skipped — ticket has pr_approved label');
+            } else {
+                try {
+                    const aiOwner = config.repository && config.repository.owner;
+                    const aiRepo  = config.repository && config.repository.repo;
+                    const projectKey = deriveProjectKey(customParams);
+                    const encodedCfg = buildAutoStartEncodedConfig(ticketKey, customParams);
+                    if (aiOwner && aiRepo) {
+                        github_trigger_workflow(
+                            aiOwner, aiRepo, 'ai-teammate.yml',
+                            JSON.stringify({
+                                concurrency_key: ticketKey,
+                                config_file:     reviewConfigFile,
+                                encoded_config:  encodedCfg,
+                                project_key:     projectKey || ''
+                            }),
+                            'main'
+                        );
+                        console.log('✅ Auto-started pr_review for', ticketKey,
+                            '[config=' + reviewConfigFile + (projectKey ? ', project=' + projectKey : '') + ']');
+                    } else {
+                        console.warn('⚠️ autoStartReview: config.repository.owner/repo not set — skipping');
+                    }
+                } catch (e) {
+                    console.warn('⚠️ autoStartReview trigger failed:', e.message || e);
+                }
+            }
+        }
 
         return {
             success: true,
