@@ -4,12 +4,15 @@ You are fixing code issues identified in a Pull Request review.
 1. `request.md` — original ticket requirements and acceptance criteria
 2. `comments.md` *(if present)* — ticket comment history with additional context or prior decisions
 3. `existing_questions.json` *(if present)* — clarification questions with PO answers; treat answered questions as binding requirements
-3. `pr_info.md` — Pull Request metadata (PR number, URL, branch)
-4. `pr_diff.txt` — Current code changes already in the PR (what was implemented)
-5. `merge_conflicts.md` *(if present)* — **Merge conflicts that MUST be resolved FIRST** before any rework
-6. `ci_failures.md` *(if present)* — **CI check failures with error logs that MUST be fixed**
-7. `pr_discussions.md` — **ALL open (unresolved) review threads that MUST be fixed** — this file contains ONLY threads that are still open on GitHub. Already-resolved threads are excluded. **Every single thread in this file requires a code fix AND a reply entry in `review_replies.json` — no exceptions.**
-8. `pr_discussions_raw.json` — Same threads with numeric IDs — use `rootCommentId` as `inReplyToId` and `id` as `threadId` when writing `outputs/review_replies.json`. **The number of reply entries MUST equal the number of threads in `pr_discussions.md`.**
+4. `parent_context_ba.md` *(if present)* — **Business Analysis**: acceptance criteria, business rules, and user flows from the parent Epic. Use to understand what must be implemented and verify the rework addresses all ACs.
+5. `parent_context_sa.md` *(if present)* — **Solution Architecture**: technical design, API contracts, and architectural decisions from the parent Epic. Follow this design when applying fixes.
+6. `parent_context_vd.md` *(if present)* — **Visual Design**: UI mockups, component specs, and design notes from the parent Epic. Align the rework with the expected look and feel.
+7. `pr_info.md` — Pull Request metadata (PR number, URL, branch)
+8. `pr_diff.txt` — Current code changes already in the PR (what was implemented)
+9. `merge_conflicts.md` *(if present)* — **Merge conflicts that MUST be resolved FIRST** before any rework
+10. `ci_failures.md` *(if present)* — **CI check failures with error logs that MUST be fixed**
+11. `pr_discussions.md` — **ALL open (unresolved) review threads that MUST be fixed** — this file contains ONLY threads that are still open on GitHub. Already-resolved threads are excluded. **Every single thread in this file requires a code fix AND a reply entry in `review_replies.json` — no exceptions.**
+12. `pr_discussions_raw.json` — Same threads with numeric IDs — use `rootCommentId` as `inReplyToId` and `id` as `threadId` when writing `outputs/review_replies.json`. **The number of reply entries MUST equal the number of threads in `pr_discussions.md`.**
 
 **If `merge_conflicts.md` is present**: The branch was automatically merged with the base branch before you started. There are unresolved conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`) in the listed files. **Resolve all conflicts first** — open each conflicting file, fix the markers keeping the correct code, then `git add <file>`. Only after all conflicts are staged should you proceed with review fixes.
 
