@@ -1,43 +1,110 @@
 /**
  * Fetch Parent Context To Input
  *
- * For a given story ticket, finds the parent ticket and then looks for child
- * sub-tasks whose summary starts with one of the known context prefixes:
- *   [BA]  — Business Analysis: acceptance criteria, business rules, user flows
- *   [SA]  — Solution Architecture: technical design, data model, API contracts
- *   [VD]  — Visual Design: UI mockups, component specs, design notes
+ * Opt-in, fully configurable context enrichment for pre-CLI agents.
+ * Activated only when `customParams.parentContextFetch` is defined.
  *
- * Each found child is written to the input folder as a separate markdown file:
- *   parent_context_ba.md   — Business Analysis context
- *   parent_context_sa.md   — Solution Architecture context
- *   parent_context_vd.md   — Visual Design context
+ * Workflow:
+ *   1. Resolve the current ticket's parent key (from ticket.fields.parent).
+ *   2. Run a JQL query ({parentKey} placeholder replaced) to find sibling tickets.
+ *   3. Fetch each result with the configured fields.
+ *   4. Match each result against configured contexts (by summary prefix).
+ *   5. Write one markdown file per matched context into the input folder.
  *
- * If the ticket has no parent, or no relevant children exist, the function
- * silently skips without error.
+ * Configuration (all fields optional except being present at all):
  *
- * Called from: preCliDevelopmentSetup.js, preparePRForReview.js,
- *              preCliReworkSetup.js (MAPC project)
+ *   customParams.parentContextFetch = {
+ *     // JQL to find context siblings. {parentKey} is replaced at runtime.
+ *     // Default shown below.
+ *     jql: 'parent = {parentKey} AND (summary ~ "[BA]" OR summary ~ "[SA]" OR summary ~ "[VD]") ORDER BY created ASC',
+ *
+ *     // Jira fields to fetch for each matched ticket.
+ *     // Always includes key, summary, status. Add custom field IDs here.
+ *     // Default: ['key', 'summary', 'description', 'status']
+ *     fields: ['key', 'summary', 'description', 'status', 'customfield_10001'],
+ *
+ *     // Contexts: how to match and name each file.
+ *     // Default shown below (BA, SA, VD).
+ *     contexts: [
+ *       {
+ *         prefix: '[BA]',                   // case-insensitive match in summary
+ *         file:   'parent_context_ba.md',   // output filename in input folder
+ *         label:  'Business Analysis',      // heading in the markdown file
+ *         description: 'Short explanation shown to the AI agent'
+ *       },
+ *       ...
+ *     ]
+ *   }
+ *
+ * If `customParams.parentContextFetch` is absent → function is a no-op.
+ * All errors are non-fatal; missing parent or empty results → silent skip.
  */
 
-var CONTEXT_TYPES = [
-    { prefix: '[BA]', file: 'parent_context_ba.md', label: 'Business Analysis',
-      description: 'Business Analysis defines the acceptance criteria (ACs), business rules, and user flows for the story. Use this as the authoritative source of truth for what must be implemented and tested.' },
-    { prefix: '[SA]', file: 'parent_context_sa.md', label: 'Solution Architecture',
-      description: 'Solution Architecture describes the technical design, data model, API contracts, and architectural decisions for the story. Follow this design when implementing.' },
-    { prefix: '[VD]', file: 'parent_context_vd.md', label: 'Visual Design',
-      description: 'Visual Design contains UI mockups, component specifications, and design notes. Use this to align the implementation with the expected look and feel.' }
+var DEFAULT_JQL = 'parent = {parentKey} AND (summary ~ "\\[BA\\]" OR summary ~ "\\[SA\\]" OR summary ~ "\\[VD\\]") ORDER BY created ASC';
+
+var DEFAULT_FIELDS = ['key', 'summary', 'description', 'status'];
+
+var DEFAULT_CONTEXTS = [
+    {
+        prefix: '[BA]',
+        file: 'parent_context_ba.md',
+        label: 'Business Analysis',
+        description: 'Business Analysis defines the acceptance criteria (ACs), business rules, and user flows. ' +
+            'This is the authoritative source of truth for what must be implemented and tested. Every AC must be addressed.'
+    },
+    {
+        prefix: '[SA]',
+        file: 'parent_context_sa.md',
+        label: 'Solution Architecture',
+        description: 'Solution Architecture describes the technical design, data model, API contracts, and ' +
+            'architectural decisions. Follow this design when implementing or reviewing code.'
+    },
+    {
+        prefix: '[VD]',
+        file: 'parent_context_vd.md',
+        label: 'Visual Design',
+        description: 'Visual Design contains UI mockups, component specifications, and design notes. ' +
+            'Align the implementation with the expected look and feel described here.'
+    }
 ];
 
 /**
- * Main action: fetch parent context children and write to input folder.
- *
- * @param {Object} params - Standard pre-CLI params (inputFolderPath, ticket, jobParams)
+ * Render all fetched fields of a ticket into a markdown section.
+ * Fields from the JQL search result + optionally the full ticket re-fetch.
+ */
+function renderFieldsMarkdown(fields, configFields) {
+    var lines = [];
+    var skip = { key: true, summary: true, status: true }; // already in header
+    for (var i = 0; i < configFields.length; i++) {
+        var fieldName = configFields[i];
+        if (skip[fieldName]) continue;
+        var val = fields[fieldName];
+        if (val === undefined || val === null || val === '') continue;
+        var displayVal = (typeof val === 'object') ? JSON.stringify(val, null, 2) : String(val);
+        var displayName = fieldName.replace(/customfield_\d+/, fieldName); // keep raw name if custom
+        lines.push('**' + displayName + ':**\n\n' + displayVal);
+    }
+    return lines.join('\n\n');
+}
+
+/**
+ * Main action — called from pre-CLI setup scripts.
+ * No-op when customParams.parentContextFetch is absent.
  */
 function action(params) {
     try {
-        var actualParams = params.inputFolderPath ? params : (params.jobParams || params);
+        var jobParams  = params.jobParams || params;
+        var actualParams = params.inputFolderPath ? params : jobParams;
+        var customParams = (jobParams.customParams) || {};
+        var cfg = customParams.parentContextFetch;
+
+        if (!cfg) {
+            // Feature not configured for this agent — silent no-op
+            return;
+        }
+
         var folder = actualParams.inputFolderPath;
-        var ticket = actualParams.ticket || (params.jobParams && params.jobParams.ticket);
+        var ticket = actualParams.ticket || (jobParams.ticket);
         var ticketKey = folder ? folder.split('/').pop() : (ticket && ticket.key);
 
         if (!ticketKey) {
@@ -45,11 +112,20 @@ function action(params) {
             return;
         }
 
-        // Resolve ticket object (may already be loaded by the caller)
-        var ticketFields = null;
-        if (ticket && ticket.fields) {
-            ticketFields = ticket.fields;
-        } else {
+        // Resolve configured options with defaults
+        var jqlTemplate = cfg.jql || DEFAULT_JQL;
+        var fields      = cfg.fields || DEFAULT_FIELDS;
+        var contexts    = cfg.contexts || DEFAULT_CONTEXTS;
+
+        // Always ensure base fields are present
+        var fetchFields = fields.slice();
+        ['key', 'summary', 'status'].forEach(function(f) {
+            if (fetchFields.indexOf(f) === -1) fetchFields.unshift(f);
+        });
+
+        // 1. Get parent key
+        var ticketFields = ticket && ticket.fields;
+        if (!ticketFields) {
             try {
                 var fetched = jira_get_ticket({ key: ticketKey });
                 ticketFields = fetched && fetched.fields;
@@ -59,65 +135,77 @@ function action(params) {
             }
         }
 
-        // Get parent key
         var parentKey = ticketFields && ticketFields.parent && ticketFields.parent.key;
         if (!parentKey) {
-            console.log('fetchParentContextToInput: ticket ' + ticketKey + ' has no parent — skipping context enrichment');
+            console.log('fetchParentContextToInput: ' + ticketKey + ' has no parent — skipping');
             return;
         }
 
-        console.log('fetchParentContextToInput: found parent ' + parentKey + ', searching for [BA]/[SA]/[VD] children...');
+        // 2. Run JQL with {parentKey} replaced
+        var jql = jqlTemplate.replace(/\{parentKey\}/g, parentKey);
+        console.log('fetchParentContextToInput: parent=' + parentKey + ', JQL: ' + jql);
 
-        // Search for sibling context tickets under the same parent
-        var contextChildren = [];
+        var results = [];
         try {
-            contextChildren = jira_search_by_jql({
-                jql: 'parent = ' + parentKey + ' AND (summary ~ "\\[BA\\]" OR summary ~ "\\[SA\\]" OR summary ~ "\\[VD\\]") ORDER BY created ASC',
-                fields: ['key', 'summary', 'description', 'status']
-            }) || [];
+            results = jira_search_by_jql({ jql: jql, fields: fetchFields }) || [];
         } catch (e) {
             console.warn('fetchParentContextToInput: JQL search failed — skipping', e);
             return;
         }
 
-        console.log('fetchParentContextToInput: found ' + contextChildren.length + ' context children');
-        if (contextChildren.length === 0) return;
+        console.log('fetchParentContextToInput: ' + results.length + ' results found');
+        if (results.length === 0) return;
 
-        // Match each child to a context type and write file
-        for (var i = 0; i < contextChildren.length; i++) {
-            var child = contextChildren[i];
-            var summary = (child.fields && child.fields.summary) || '';
+        // 3. Match each result to a context and write file
+        for (var i = 0; i < results.length; i++) {
+            var item = results[i];
+            var itemFields = item.fields || {};
+            var summary = itemFields.summary || '';
 
-            for (var j = 0; j < CONTEXT_TYPES.length; j++) {
-                var ctx = CONTEXT_TYPES[j];
+            for (var j = 0; j < contexts.length; j++) {
+                var ctx = contexts[j];
                 if (summary.toUpperCase().indexOf(ctx.prefix.toUpperCase()) === -1) continue;
 
-                // Fetch full ticket content
-                var fullContent = child.fields && child.fields.description;
-                if (!fullContent) {
+                // Re-fetch full ticket if any requested field is missing in search result
+                var needsFullFetch = fetchFields.some(function(f) {
+                    return !(f in itemFields) || itemFields[f] === undefined;
+                });
+                if (needsFullFetch) {
                     try {
-                        var full = jira_get_ticket({ key: child.key });
-                        fullContent = full && full.fields && full.fields.description;
+                        var full = jira_get_ticket({ key: item.key });
+                        if (full && full.fields) {
+                            // Merge: full ticket fields override partial search result
+                            var merged = {};
+                            for (var k in itemFields) { merged[k] = itemFields[k]; }
+                            for (var k2 in full.fields) { merged[k2] = full.fields[k2]; }
+                            itemFields = merged;
+                        }
                     } catch (e) {
-                        console.warn('fetchParentContextToInput: could not fetch full content for ' + child.key, e);
+                        console.warn('fetchParentContextToInput: re-fetch failed for ' + item.key + ' (using partial data)', e);
                     }
                 }
 
+                // Build markdown
                 var md = '# ' + ctx.label + ' — ' + summary + '\n\n';
-                md += '> **' + ctx.label + '** (' + child.key + '): ' + ctx.description + '\n\n';
-                md += '**Ticket:** ' + child.key + '\n';
-                md += '**Status:** ' + (child.fields && child.fields.status && child.fields.status.name || 'Unknown') + '\n\n';
+                if (ctx.description) {
+                    md += '> **' + ctx.label + '** (' + item.key + '): ' + ctx.description + '\n\n';
+                }
+                md += '**Ticket:** ' + item.key + '\n';
+                md += '**Status:** ' + (itemFields.status && itemFields.status.name || 'Unknown') + '\n\n';
                 md += '---\n\n';
-                md += (fullContent || '_No description provided._') + '\n';
+
+                var fieldsContent = renderFieldsMarkdown(itemFields, fetchFields);
+                md += fieldsContent || '_No content available._';
+                md += '\n';
 
                 var filePath = folder + '/' + ctx.file;
                 try {
                     file_write(filePath, md);
-                    console.log('✅ fetchParentContextToInput: wrote ' + ctx.file + ' (' + child.key + ')');
+                    console.log('✅ fetchParentContextToInput: wrote ' + ctx.file + ' (' + item.key + ')');
                 } catch (writeErr) {
                     console.warn('fetchParentContextToInput: failed to write ' + filePath, writeErr);
                 }
-                break; // matched, no need to check other prefixes
+                break;
             }
         }
 
