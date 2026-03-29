@@ -15,16 +15,15 @@
  *
  *   customParams.parentContextFetch = {
  *     // JQL to find context siblings. {parentKey} is replaced at runtime.
- *     // Default shown below.
  *     jql: 'parent = {parentKey} AND (summary ~ "[BA]" OR summary ~ "[SA]" OR summary ~ "[VD]") ORDER BY created ASC',
  *
  *     // Jira fields to fetch for each matched ticket.
- *     // Always includes key, summary, status. Add custom field IDs here.
- *     // Default: ['key', 'summary', 'description', 'status']
  *     fields: ['key', 'summary', 'description', 'status', 'customfield_10001'],
  *
+ *     // fieldLabels: optional map of fieldId → human-readable display name.
+ *     fieldLabels: { 'customfield_11700': 'Acceptance Criteria' },
+ *
  *     // Contexts: how to match and name each file.
- *     // Default shown below (BA, SA, VD).
  *     contexts: [
  *       {
  *         prefix: '[BA]',                   // case-insensitive match in summary
@@ -33,7 +32,15 @@
  *         description: 'Short explanation shown to the AI agent'
  *       },
  *       ...
- *     ]
+ *     ],
+ *
+ *     // childQuestions (optional): for each matched BA/SA/VD ticket, also fetch
+ *     // its [Q] question sub-tasks and append them to the context file.
+ *     // {contextTicketKey} is replaced with the actual ticket key at runtime.
+ *     childQuestions: {
+ *       jql: 'parent = {contextTicketKey} AND labels = Q ORDER BY created ASC',
+ *       answerField: 'description'   // Jira field holding the answer (default: 'description')
+ *     }
  *   }
  *
  * If `customParams.parentContextFetch` is absent → function is a no-op.
@@ -154,6 +161,7 @@ function action(params) {
         var fields      = cfg.fields || DEFAULT_FIELDS;
         var contexts    = cfg.contexts || DEFAULT_CONTEXTS;
         var fieldLabels = cfg.fieldLabels || {};
+        var childQuestionsCfg = cfg.childQuestions || null;
 
         // Always ensure base fields are present
         var fetchFields = fields.slice();
@@ -243,6 +251,44 @@ function action(params) {
                 } catch (writeErr) {
                     console.warn('fetchParentContextToInput: failed to write ' + filePath, writeErr);
                 }
+
+                // Append [Q] question sub-tasks of this context ticket (if configured)
+                if (childQuestionsCfg) {
+                    try {
+                        var qJql = (childQuestionsCfg.jql || 'parent = {contextTicketKey} AND labels = Q ORDER BY created ASC')
+                            .replace(/\{contextTicketKey\}/g, item.key);
+                        var answerField = childQuestionsCfg.answerField || 'description';
+                        var qResults = jira_search_by_jql({
+                            jql: qJql,
+                            fields: ['key', 'summary', 'description', 'status', answerField]
+                        }) || [];
+                        if (qResults.length > 0) {
+                            var qMd = '\n\n---\n\n## Questions & Answers (' + item.key + ')\n\n';
+                            for (var q = 0; q < qResults.length; q++) {
+                                var qItem = qResults[q];
+                                var qf = qItem.fields || {};
+                                var answer = qf[answerField] || qf[answerField.toLowerCase()] || null;
+                                qMd += '**Q' + (q + 1) + ': ' + (qf.summary || qItem.key) + '**\n\n';
+                                if (qf.description && qf.description !== answer) {
+                                    qMd += qf.description + '\n\n';
+                                }
+                                qMd += answer
+                                    ? '_Answer: ' + answer + '_\n\n'
+                                    : '_Answer: (not yet answered)_\n\n';
+                            }
+                            try {
+                                var existing = file_read({ path: filePath }) || '';
+                                file_write(filePath, existing + qMd);
+                                console.log('✅ fetchParentContextToInput: appended ' + qResults.length + ' Q(s) to ' + ctx.file);
+                            } catch (appendErr) {
+                                console.warn('fetchParentContextToInput: failed to append questions to ' + ctx.file, appendErr);
+                            }
+                        }
+                    } catch (qErr) {
+                        console.warn('fetchParentContextToInput: childQuestions fetch failed for ' + item.key + ' (non-fatal):', qErr);
+                    }
+                }
+
                 break;
             }
         }
