@@ -42,7 +42,7 @@
 
 var DEFAULT_JQL = 'parent = {parentKey} AND (summary ~ "\\[BA\\]" OR summary ~ "\\[SA\\]" OR summary ~ "\\[VD\\]") ORDER BY created ASC';
 
-var DEFAULT_FIELDS = ['key', 'summary', 'description', 'status'];
+var DEFAULT_FIELDS = ['key', 'summary', 'description', 'status', 'comment'];
 
 var DEFAULT_CONTEXTS = [
     {
@@ -84,10 +84,42 @@ function renderFieldsMarkdown(fields, configFields, fieldLabels) {
         if (skip[fieldName]) continue;
         var val = fields[fieldName];
         if (val === undefined || val === null || val === '') continue;
+
+        // Special rendering for Jira comment field
+        if (fieldName === 'comment') {
+            var commentBlock = renderCommentsMarkdown(val);
+            if (commentBlock) lines.push(commentBlock);
+            continue;
+        }
+
         var displayVal = (typeof val === 'object') ? JSON.stringify(val, null, 2) : String(val);
         // Use provided label, else strip customfield_ prefix for readability
         var displayName = labels[fieldName] || fieldName.replace(/^customfield_\d+$/, fieldName);
         lines.push('**' + displayName + ':**\n\n' + displayVal);
+    }
+    return lines.join('\n\n');
+}
+
+/**
+ * Render Jira comment field as a readable markdown section.
+ * Handles both {total, comments:[]} shape and plain arrays.
+ */
+function renderCommentsMarkdown(commentField) {
+    var comments = [];
+    if (Array.isArray(commentField)) {
+        comments = commentField;
+    } else if (commentField && Array.isArray(commentField.comments)) {
+        comments = commentField.comments;
+    }
+    if (comments.length === 0) return '';
+
+    var lines = ['**Comments:**\n'];
+    for (var i = 0; i < comments.length; i++) {
+        var c = comments[i];
+        var author = (c.author && (c.author.displayName || c.author.emailAddress)) || 'Unknown';
+        var date = c.created ? c.created.substring(0, 10) : '';
+        var body = c.body || '';
+        lines.push('> **' + author + '** (' + date + '):\n>\n> ' + body.replace(/\n/g, '\n> '));
     }
     return lines.join('\n\n');
 }
