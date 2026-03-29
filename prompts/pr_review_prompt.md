@@ -78,7 +78,19 @@ Categorize all findings as:
 
 Be thorough, constructive, and specific. Provide file paths and line numbers for all findings.
 
-**CRITICAL — Inline comment diff-only rule**: Inline comments can ONLY be placed on lines that appear inside a diff hunk in `pr_diff.txt` (lines changed or added in this PR). If a finding is about a file or line **not touched in this PR**, include it in the general comment as text — do NOT create an inline comment for it. The GitHub API rejects inline comments on lines outside the diff with a 422 error.
+**CRITICAL — Inline comment diff-only rule**: Inline comments can ONLY be placed on lines that appear inside a diff hunk in `pr_diff.txt`. If a finding is about a file or line **not touched in this PR**, include it in the general comment as text — do NOT create an inline comment for it. The GitHub API rejects inline comments on lines outside the diff with a 422 error.
+
+**CRITICAL — Line numbers must be ACTUAL FILE line numbers, not diff positions**: The `line` field must be the real line number in the file — calculated from the `@@` hunk header, NOT counted from the top of `pr_diff.txt`.
+
+How to calculate the correct line number:
+1. Find the hunk header for the file: `@@ -old_start,old_count +new_start,new_count @@`
+2. The `+new_start` value is the line number of the **first line in that hunk** (including context lines)
+3. Count down from there: context lines and `+` lines increment the counter, `-` lines do NOT
+4. The line number of a specific `+` line = `new_start` + (its offset from the hunk header, counting only context and `+` lines)
+
+Example: `@@ -1344,6 +1344,9 @@` → the added line `+  accessibility_time_range_to: 'to'` at position 4 in the hunk (after 3 context lines) = line **1347**, NOT line 11.
+
+When unsure about the exact line number, prefer putting the finding in the **general comment** rather than risk a wrong inline position.
 
 **CRITICAL — Threads first, summary second**: Your primary output is `inlineComments` — every finding that can be placed on a diff line MUST be an inline thread. The general comment is just a short summary header. Do NOT repeat findings in the general comment that are already covered by inline threads.
 
@@ -115,8 +127,8 @@ This is the machine-readable result consumed by the post-action. If it is missin
 
 - **`recommendation`** — EXACTLY `"APPROVE"`, `"REQUEST_CHANGES"`, or `"BLOCK"`. Never `"APPROVED"`. Never `"verdict"`.
 - **`inlineComments[].path`** — relative file path (NOT `"file"`). **`inlineComments[].body`** — inline text (NOT `"comment"` file path). Wrong field names = comments silently not posted.
-- **`issueCounts`** — REQUIRED even if all zeros. Count every finding across ALL categories.
-- **`inlineComments`** — only lines that appear in the diff hunk. Lines outside the diff → GitHub API rejects with 422.
+- **`inlineComments[].line`** — ACTUAL file line number from the `@@` hunk header (e.g. if hunk is `@@ -1344,6 +1344,9 @@` and the changed line is 3 lines into the hunk, `line` = 1347). NEVER use a line number counted from the top of `pr_diff.txt`.
+- **`inlineComments`** — only lines that appear in the diff hunk. Lines outside the diff → GitHub API rejects with 422. **When in doubt, use general comment instead.**
 
 ### 2. `outputs/pr_review_general.md` — REQUIRED
 Short general PR comment — **5-10 lines maximum**. This is just the header/summary; all details are in the inline threads.
