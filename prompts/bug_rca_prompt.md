@@ -37,7 +37,14 @@ The root cause must be a **specific code-level finding**: a wrong condition, mis
 
 ## Output files
 
-Write your findings to the output files following the formatting rules and template provided in your instructions.
+> **⚠️ CRITICAL — output paths are exact. Do NOT create subdirectories.**
+> Write output to:
+> - `outputs/response.md` — RCA document (Jira wiki markup)
+> - `outputs/diagram.md` — Mermaid diagram
+>
+> **Do NOT write to `outputs/{ticketKey}/response.md` or any subdirectory.** The post-processing pipeline reads from the root `outputs/` path. Writing to a subdirectory will cause the RCA to be silently discarded and never submitted to Jira.
+
+Write your findings following the formatting rules and template provided in your instructions.
 
 **Do NOT write actual source code, method bodies, or code snippets** — reference files and functions by name and role only. This is an analysis document, not an implementation guide.
 
