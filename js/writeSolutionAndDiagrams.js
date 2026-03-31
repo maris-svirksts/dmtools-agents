@@ -32,27 +32,34 @@ function action(params) {
         console.log('Processing solution and diagrams for:', ticketKey);
         console.log('Solution field: ' + solutionField + ', Diagram field: ' + (diagramField || '(none — will prepend to solution)') + ', outputType: ' + outputType);
 
-        // 1. Read solution from outputs/response.md
-        var solution = '';
-        try {
-            solution = file_read('outputs/response.md');
-            if (solution) solution = solution.trim();
-        } catch (e) {
-            console.error('Failed to read outputs/response.md:', e);
-            return { success: false, error: 'Could not read outputs/response.md' };
+        // Helper: read a file from root outputs/ path; fall back to ticket-specific subdirectory.
+        // CLI agents sometimes write to outputs/{ticketKey}/ instead of outputs/ root.
+        function readOutput(filename) {
+            var rootPath    = 'outputs/' + filename;
+            var ticketPath  = 'outputs/' + ticketKey + '/' + filename;
+            var content = '';
+            try {
+                content = file_read(rootPath);
+            } catch (e) { /* not found at root — try ticket subdir */ }
+            if (!content) {
+                try {
+                    content = file_read(ticketPath);
+                    if (content) console.log('Read ' + filename + ' from ticket subdir: ' + ticketPath);
+                } catch (e) { /* not found in subdir either */ }
+            }
+            return content ? content.trim() : '';
         }
+
+        // 1. Read solution from outputs/response.md (or outputs/{ticketKey}/response.md)
+        var solution = readOutput('response.md');
         if (!solution) {
+            console.error('outputs/response.md not found at root or ticket subdir');
             return { success: false, error: 'outputs/response.md is empty' };
         }
 
-        // 2. Read diagram from outputs/diagram.md
-        var diagram = '';
-        try {
-            diagram = file_read('outputs/diagram.md');
-            if (diagram) diagram = diagram.trim();
-        } catch (e) {
-            console.warn('Failed to read outputs/diagram.md, skipping diagram update:', e);
-        }
+        // 2. Read diagram from outputs/diagram.md (or outputs/{ticketKey}/diagram.md)
+        var diagram = readOutput('diagram.md');
+        if (!diagram) console.warn('No diagram.md found, skipping diagram update');
 
         // 3. If no dedicated diagram field — prepend diagram as Jira code block to solution
         if (diagram && !diagramField) {
